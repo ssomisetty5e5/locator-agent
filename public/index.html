@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocatorAgent — Smart Web Locator Generator</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+  <style>
+    /* ── Reset & Base ─────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #242836;
+      --border: #2e3345;
+      --text: #e1e4ed;
+      --text-muted: #8b90a0;
+      --primary: #6c5ce7;
+      --primary-light: #a29bfe;
+      --green: #00b894;
+      --green-bg: rgba(0,184,148,0.1);
+      --yellow: #fdcb6e;
+      --yellow-bg: rgba(253,203,110,0.1);
+      --red: #e17055;
+      --red-bg: rgba(225,112,85,0.1);
+      --blue: #74b9ff;
+      --blue-bg: rgba(116,185,255,0.1);
+      --orange: #e17055;
+      --radius: 10px;
+      --radius-sm: 6px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.3);
+      --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      --mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    a { color: var(--primary-light); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Layout ────────────────────────────────────── */
+    .app { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    /* ── Header ────────────────────────────────────── */
+    .header {
+      text-align: center;
+      padding: 40px 0 32px;
+    }
+    .header h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--primary-light), var(--blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header p {
+      color: var(--text-muted);
+      margin-top: 8px;
+      font-size: 1.05rem;
+    }
+
+    /* ── Input Panel ───────────────────────────────── */
+    .input-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+    }
+    .tab {
+      flex: 1;
+      padding: 10px 16px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      transition: all 0.2s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      background: var(--primary);
+      color: #fff;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .input-group { margin-bottom: 16px; }
+    .input-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .input-group input[type="text"],
+    .input-group textarea {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 0.95rem;
+      font-family: var(--mono);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-group input:focus,
+    .input-group textarea:focus {
+      border-color: var(--primary);
+    }
+    .input-group textarea {
+      min-height: 180px;
+      resize: vertical;
+    }
+
+    .options-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .checkbox-label input[type="checkbox"] {
+      accent-color: var(--primary);
+      width: 16px;
+      height: 16px;
+    }
+    .select-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .select-group label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .select-group select {
+      padding: 6px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), #5a4bd1);
+      color: #fff;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(108,92,231,0.4); }
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* ── Loading ────────────────────────────────────── */
+    .loading-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15,17,23,0.85);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .loading-overlay.active { display: flex; }
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--border);
+      border-top-color: var(--primary-light);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text {
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+
+    /* ── Results ────────────────────────────────────── */
+    .results { display: none; }
+    .results.active { display: block; }
+
+    .summary-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+      text-align: center;
+    }
+    .summary-card .value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--primary-light);
+    }
+    .summary-card .label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+
+    /* Filter bar */
+    .filter-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .filter-bar input {
+      flex: 1;
+      min-width: 200px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+    }
+    .filter-bar input:focus { border-color: var(--primary); }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+    .badge-yellow { background: var(--yellow-bg); color: var(--yellow); }
+    .badge-red { background: var(--red-bg); color: var(--red); }
+    .badge-blue { background: var(--blue-bg); color: var(--blue); }
+
+    /* ── Element Card ──────────────────────────────── */
+    .element-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .element-card:hover { border-color: var(--primary); }
+    .element-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .element-header:hover { background: var(--surface2); }
+    .element-info { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+    .element-index {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--primary-light);
+      background: rgba(108,92,231,0.15);
+      padding: 4px 10px;
+      border-radius: 12px;
+      white-space: nowrap;
+    }
+    .element-tag {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--blue);
+    }
+    .element-text {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .element-badges { display: flex; gap: 6px; flex-shrink: 0; }
+    .chevron {
+      color: var(--text-muted);
+      transition: transform 0.2s;
+      font-size: 1.2rem;
+    }
+    .element-card.expanded .chevron { transform: rotate(180deg); }
+
+    .element-body {
+      display: none;
+      padding: 0 20px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .element-card.expanded .element-body { display: block; }
+
+    /* Attributes section */
+    .attrs-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 12px 0;
+    }
+    .attr-chip {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      padding: 3px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+    }
+    .attr-chip .attr-key { color: var(--yellow); }
+    .attr-chip .attr-val { color: var(--green); }
+
+    /* ── Locator Table ─────────────────────────────── */
+    .locator-section-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin: 16px 0 8px;
+    }
+    .recommended-box {
+      background: rgba(0,184,148,0.08);
+      border: 1px solid rgba(0,184,148,0.25);
+      border-radius: var(--radius-sm);
+      padding: 14px 18px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .recommended-box .star { font-size: 1.3rem; }
+    .recommended-box .loc-value {
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      color: var(--green);
+      word-break: break-all;
+      flex: 1;
+      min-width: 200px;
+    }
+    .recommended-box .loc-meta {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .copy-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .copy-btn.copied { background: var(--green); color: #fff; border-color: var(--green); }
+
+    .locators-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .locators-table th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .locators-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .locators-table tr:last-child td { border-bottom: none; }
+    .locators-table tr:hover td { background: var(--surface2); }
+    .loc-strategy { font-weight: 600; color: var(--blue); white-space: nowrap; }
+    .loc-framework { color: var(--text-muted); font-size: 0.78rem; }
+    .loc-val {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      word-break: break-all;
+      max-width: 500px;
+    }
+    .score-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .score-bar-track {
+      width: 60px;
+      height: 6px;
+      background: var(--bg);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s;
+    }
+    .score-num {
+      font-weight: 700;
+      font-size: 0.82rem;
+      min-width: 24px;
+    }
+
+    /* ── HTML Snippet ──────────────────────────────── */
+    .html-snippet {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      overflow-x: auto;
+      margin-top: 12px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ── Error ──────────────────────────────────────── */
+    .error-box {
+      display: none;
+      background: var(--red-bg);
+      border: 1px solid rgba(225,112,85,0.3);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      color: var(--red);
+    }
+    .error-box.active { display: block; }
+
+    /* ── Footer ─────────────────────────────────────── */
+    .footer {
+      text-align: center;
+      padding: 32px 0;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    /* ── Responsive ─────────────────────────────────── */
+    @media (max-width: 768px) {
+      .app { padding: 12px; }
+      .header h1 { font-size: 1.5rem; }
+      .summary-bar { grid-template-columns: repeat(2, 1fr); }
+      .options-row { flex-direction: column; align-items: flex-start; }
+      .recommended-box { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Header -->
+  <header class="header">
+    <h1>🎯 LocatorAgent</h1>
+    <p>Smart web locator generator with Shadow DOM support &amp; robustness scoring</p>
+    <p style="margin-top:16px;">
+      <a href="/browser.html" style="display:inline-flex;align-items:center;gap:8px;padding:10px 24px;background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:0.95rem;transition:all 0.2s;">
+        🖥️ Open Live Browser — Login &amp; interact with any site
+      </a>
+    </p>
+  </header>
+
+  <!-- Input Panel -->
+  <section class="input-panel">
+    <div class="tabs">
+      <button class="tab active" data-tab="url-tab">🌐 URL</button>
+      <button class="tab" data-tab="html-tab">📄 HTML Snippet</button>
+    </div>
+
+    <div id="url-tab" class="tab-content active">
+      <div class="input-group">
+        <label for="url-input">Page URL</label>
+        <input type="text" id="url-input" placeholder="https://example.com" spellcheck="false">
+      </div>
+    </div>
+
+    <div id="html-tab" class="tab-content">
+      <div class="input-group">
+        <label for="html-input">HTML Source</label>
+        <textarea id="html-input" placeholder="<html>&#10;  <body>&#10;    <button id=&quot;login&quot;>Log In</button>&#10;  </body>&#10;</html>"></textarea>
+      </div>
+    </div>
+
+    <div class="options-row">
+      <label class="checkbox-label">
+        <input type="checkbox" id="opt-all">
+        Include non-interactive elements
+      </label>
+      <div class="select-group">
+        <label for="opt-max">Max elements:</label>
+        <select id="opt-max">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="analyze-btn" onclick="runAnalysis()">
+      <span id="btn-text">🔍 Analyze Page</span>
+    </button>
+  </section>
+
+  <!-- Error -->
+  <div class="error-box" id="error-box"></div>
+
+  <!-- Results -->
+  <section class="results" id="results">
+    <div class="summary-bar" id="summary-bar"></div>
+    <div class="filter-bar">
+      <input type="text" id="filter-input" placeholder="Filter elements by tag, text, attribute..." oninput="filterElements()">
+    </div>
+    <div id="elements-container"></div>
+  </section>
+
+  <footer class="footer">
+    LocatorAgent v1.0.0 — Strategies: TestID · AriaRole · AriaLabel · Text · ID · CSS · ShadowCSS · XPath · Name · Placeholder
+  </footer>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">Analyzing page & generating locators…</div>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────
+  let currentResult = null;
+
+  // ── Tabs ───────────────────────────────────────
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── Analyze ────────────────────────────────────
+  async function runAnalysis() {
+    const urlTab = document.querySelector('[data-tab="url-tab"]').classList.contains('active');
+    const url = document.getElementById('url-input').value.trim();
+    const html = document.getElementById('html-input').value.trim();
+    const includeAll = document.getElementById('opt-all').checked;
+    const maxElements = parseInt(document.getElementById('opt-max').value);
+
+    const errorBox = document.getElementById('error-box');
+    errorBox.classList.remove('active');
+
+    if (urlTab && !url) {
+      showError('Please enter a URL to analyze.');
+      return;
+    }
+    if (!urlTab && !html) {
+      showError('Please paste HTML source code to analyze.');
+      return;
+    }
+
+    const body = {};
+    if (urlTab) body.url = url;
+    else body.html = html;
+    body.includeNonInteractive = includeAll;
+    body.maxElements = maxElements;
+
+    const btn = document.getElementById('analyze-btn');
+    btn.disabled = true;
+    document.getElementById('loading').classList.add('active');
+    document.getElementById('results').classList.remove('active');
+
+    try {
+      const res = await fetch('/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.error || 'Analysis failed.');
+        return;
+      }
+
+      currentResult = data;
+      renderResults(data);
+    } catch (err) {
+      showError('Network error: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      document.getElementById('loading').classList.remove('active');
+    }
+  }
+
+  // Allow Enter key in URL field
+  document.getElementById('url-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') runAnalysis();
+  });
+
+  // ── Render ─────────────────────────────────────
+  function renderResults(data) {
+    // Summary cards
+    const summary = document.getElementById('summary-bar');
+    summary.innerHTML = `
+      <div class="summary-card">
+        <div class="value">${data.totalDomElements}</div>
+        <div class="label">DOM Elements</div>
+      </div>
+      <div class="summary-card">
+        <div class="value">${data.interactiveElementsFound}</div>
+        <div class="label">Interactive</div>
+      </div>
+      <div class="summary-card">
+        <div class="value">${data.shadowRootsPierced}</div>
+        <div class="label">Shadow Roots</div>
+      </div>
+      <div class="summary-card">
+        <div class="value">${data.elements.reduce((sum, e) => sum + e.locators.length, 0)}</div>
+        <div class="label">Total Locators</div>
+      </div>
+      <div class="summary-card">
+        <div class="value" style="font-size:1rem; word-break:break-all;">${escHtml(data.pageTitle || '—')}</div>
+        <div class="label">Page Title</div>
+      </div>
+    `;
+
+    renderElements(data.elements);
+    document.getElementById('results').classList.add('active');
+    document.getElementById('filter-input').value = '';
+  }
+
+  function renderElements(elements) {
+    const container = document.getElementById('elements-container');
+
+    if (elements.length === 0) {
+      container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">No elements found.</p>';
+      return;
+    }
+
+    container.innerHTML = elements.map((analysis, idx) => {
+      const el = analysis.element;
+      const rec = analysis.recommended;
+      const locators = analysis.locators;
+
+      const shadowBadge = el.shadowDepth > 0
+        ? `<span class="badge badge-blue">Shadow ${el.shadowDepth}</span>`
+        : '';
+      const tagLabel = el.tag;
+      const textLabel = el.text ? `"${escHtml(el.text.substring(0, 50))}"` : '';
+
+      // Attribute chips
+      const importantAttrs = ['id', 'name', 'type', 'data-testid', 'aria-label', 'role', 'placeholder', 'href', 'class'];
+      const attrChips = importantAttrs
+        .filter(k => el.attributes[k])
+        .map(k => `<span class="attr-chip"><span class="attr-key">${escHtml(k)}</span>=<span class="attr-val">"${escHtml(el.attributes[k].substring(0, 50))}"</span></span>`)
+        .join('');
+
+      // Locator rows
+      const locatorRows = locators.map(loc => {
+        const color = scoreColor(loc.score);
+        return `
+          <tr>
+            <td class="loc-strategy">${escHtml(loc.strategy)}</td>
+            <td class="loc-framework">${escHtml(loc.framework)}</td>
+            <td class="loc-val">${escHtml(loc.value)}</td>
+            <td>
+              <div class="score-bar">
+                <div class="score-bar-track">
+                  <div class="score-bar-fill" style="width:${loc.score}%; background:${color};"></div>
+                </div>
+                <span class="score-num" style="color:${color}">${loc.score}</span>
+              </div>
+            </td>
+            <td><button class="copy-btn" onclick="copyText(this, '${escAttr(loc.value)}')">Copy</button></td>
+          </tr>`;
+      }).join('');
+
+      return `
+        <div class="element-card" data-searchtext="${escAttr(JSON.stringify(el).toLowerCase())}">
+          <div class="element-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <div class="element-info">
+              <span class="element-index">#${idx + 1}</span>
+              <span class="element-tag">&lt;${tagLabel}&gt;</span>
+              <span class="element-text">${textLabel}</span>
+            </div>
+            <div class="element-badges">
+              ${shadowBadge}
+              <span class="badge ${scoreBadgeClass(rec.score)}">${rec.score} pts</span>
+            </div>
+            <span class="chevron">▼</span>
+          </div>
+          <div class="element-body">
+            <div class="attrs-grid">${attrChips || '<span class="attr-chip" style="color:var(--text-muted)">No key attributes</span>'}</div>
+
+            <div class="locator-section-title">★ Recommended Locator</div>
+            <div class="recommended-box">
+              <span class="star">⭐</span>
+              <span class="loc-value">${escHtml(rec.value)}</span>
+              <div class="loc-meta">
+                <span class="badge badge-green">${rec.strategy}</span>
+                <span class="badge badge-blue">${rec.framework}</span>
+                <button class="copy-btn" onclick="copyText(this, '${escAttr(rec.value)}')">Copy</button>
+              </div>
+            </div>
+
+            <div class="locator-section-title">All Locators (${locators.length})</div>
+            <div style="overflow-x:auto;">
+              <table class="locators-table">
+                <thead>
+                  <tr><th>Strategy</th><th>Framework</th><th>Locator</th><th>Score</th><th></th></tr>
+                </thead>
+                <tbody>${locatorRows}</tbody>
+              </table>
+            </div>
+
+            <div class="locator-section-title">HTML Snippet</div>
+            <div class="html-snippet">${escHtml(el.htmlSnippet)}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ── Filter ─────────────────────────────────────
+  function filterElements() {
+    const query = document.getElementById('filter-input').value.toLowerCase();
+    document.querySelectorAll('.element-card').forEach(card => {
+      const text = card.dataset.searchtext || '';
+      card.style.display = text.includes(query) ? '' : 'none';
+    });
+  }
+
+  // ── Helpers ────────────────────────────────────
+  function showError(msg) {
+    const box = document.getElementById('error-box');
+    box.textContent = msg;
+    box.classList.add('active');
+  }
+
+  function escHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function escAttr(s) {
+    if (!s) return '';
+    return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g, '&quot;');
+  }
+
+  function scoreColor(score) {
+    if (score >= 80) return 'var(--green)';
+    if (score >= 55) return 'var(--yellow)';
+    return 'var(--red)';
+  }
+
+  function scoreBadgeClass(score) {
+    if (score >= 80) return 'badge-green';
+    if (score >= 55) return 'badge-yellow';
+    return 'badge-red';
+  }
+
+  function copyText(btn, text) {
+    // Decode HTML entities
+    const el = document.createElement('textarea');
+    el.innerHTML = text;
+    const decoded = el.value;
+
+    navigator.clipboard.writeText(decoded).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 1500);
+    });
+  }
+</script>
+
+</body>
+</html>

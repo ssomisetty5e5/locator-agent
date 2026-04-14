@@ -1,0 +1,1 @@
+export { LocatorGenerator } from './locatorGenerator';

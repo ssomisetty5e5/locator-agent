@@ -1,0 +1,1 @@
+export { LocatorValidator } from './locatorValidator';

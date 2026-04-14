@@ -1,0 +1,36 @@
+{
+  "name": "locator-agent",
+  "version": "1.0.0",
+  "description": "Smart web locator generator that pierces Shadow DOM for automation testing",
+  "main": "dist/cli/index.js",
+  "bin": {
+    "locator-agent": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start:api": "ts-node src/api/server.ts",
+    "cli": "ts-node src/cli/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "cheerio": "^1.0.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^13.1.0",
+    "express": "^4.21.0",
+    "playwright": "^1.52.0",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.15.0",
+    "@types/ws": "^8.18.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

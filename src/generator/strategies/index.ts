@@ -1,0 +1,10 @@
+export { TestIdStrategy } from './testIdStrategy';
+export { AriaRoleStrategy } from './ariaRoleStrategy';
+export { AriaLabelStrategy } from './ariaLabelStrategy';
+export { TextStrategy } from './textStrategy';
+export { IdStrategy } from './idStrategy';
+export { CssStrategy } from './cssStrategy';
+export { ShadowPiercingCssStrategy } from './shadowPiercingCssStrategy';
+export { XPathStrategy } from './xpathStrategy';
+export { NameStrategy } from './nameStrategy';
+export { PlaceholderStrategy } from './placeholderStrategy';
