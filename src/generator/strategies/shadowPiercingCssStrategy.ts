@@ -28,7 +28,7 @@ export class ShadowPiercingCssStrategy implements ILocatorStrategy {
     //   [B, C, D, target], [C, D, target], [D, target]
     // These shorter variants will be validated for uniqueness later —
     // unique short chains will score higher than the long ones.
-    if (chainParts.length > 3) {
+    if (chainParts.length > 2) {
       for (let start = 1; start < chainParts.length - 1; start++) {
         const shortened = chainParts.slice(start);
         if (shortened.length >= 2) {

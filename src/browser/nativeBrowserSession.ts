@@ -231,13 +231,19 @@ export class NativeBrowserSession {
             if (!ctx) return;
 
             // Try to reuse an existing page (Chrome always has at least one tab open)
+            // IMPORTANT: exclude the LocatorAgent native.html tab itself — navigating it
+            // away would break the UI and cause Chrome to open a replacement tab.
             const pages = ctx.pages();
+            const candidates = pages.filter(p => {
+              const u = p.url();
+              return !u.includes('localhost:3000');
+            });
             let page: Page | null = null;
-            if (pages.length > 0) {
-              page = pages.find(p => {
+            if (candidates.length > 0) {
+              page = candidates.find(p => {
                 const u = p.url();
                 return u === 'about:blank' || u === 'chrome://newtab/' || u === 'chrome://new-tab-page/';
-              }) || pages[pages.length - 1];
+              }) || candidates[candidates.length - 1];
             } else {
               page = await ctx.newPage();
             }

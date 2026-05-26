@@ -83,12 +83,15 @@ export class LocatorRanker {
       } else if (locator.framework === 'css' && locator.value.includes(' >>> ')) {
         chainLevels = locator.value.split(' >>> ').length;
       }
-      if (chainLevels > 0 && chainLevels <= 3) {
-        const bonus = (4 - chainLevels) * 5; // 2 levels=+10, 3 levels=+5
+      if (chainLevels > 0 && chainLevels <= 2) {
+        score += 15;
+        reasons.push(`+15 minimal shadow chain (${chainLevels} levels)`);
+      } else if (chainLevels > 0 && chainLevels <= 4) {
+        const bonus = (5 - chainLevels) * 5; // 3 levels=+10, 4 levels=+5
         score += bonus;
         reasons.push(`+${bonus} short shadow chain (${chainLevels} levels)`);
       } else if (chainLevels > 6) {
-        const penalty = Math.min(15, (chainLevels - 6) * 3);
+        const penalty = Math.min(20, (chainLevels - 5) * 4);
         score -= penalty;
         reasons.push(`-${penalty} deep shadow chain (${chainLevels} levels)`);
       }
@@ -145,18 +148,22 @@ export class LocatorRanker {
     if (locator.matchCount !== undefined) {
       if (locator.matchCount === 1) {
         // Unique — strong bonus
-        score += 10;
-        reasons.push('+10 unique (1 match)');
+        score += 20;
+        reasons.push('+20 unique (1 match)');
       } else if (locator.matchCount === 0) {
         // Matches nothing — severe penalty
-        score -= 40;
-        reasons.push(`-40 matches 0 elements`);
+        score -= 50;
+        reasons.push(`-50 matches 0 elements`);
       } else {
-        // Multiple matches — penalty proportional to count
-        const penalty = Math.min(35, 15 + Math.floor(Math.log2(locator.matchCount) * 5));
+        // Multiple matches — heavy penalty (non-unique locators are unreliable)
+        const penalty = Math.min(45, 25 + Math.floor(Math.log2(locator.matchCount) * 5));
         score -= penalty;
         reasons.push(`-${penalty} not unique (${locator.matchCount} matches)`);
       }
+    } else {
+      // Could not validate uniqueness — mild penalty (prefer validated locators)
+      score -= 5;
+      reasons.push('-5 uniqueness unverified');
     }
 
     // Clamp between 0 and 100

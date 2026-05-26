@@ -45,6 +45,7 @@ export class BrowserSession {
   private generator = new LocatorGenerator();
   private ranker = new LocatorRanker();
   private validator = new LocatorValidator();
+  private pendingFileChooser: any = null;
 
   constructor(id: string) {
     this.id = id;
@@ -92,6 +93,15 @@ export class BrowserSession {
       if (frame === this.page!.mainFrame()) {
         this.sendMessage({ type: 'navigated', url: this.page!.url() });
       }
+    });
+
+    // Listen for file chooser dialogs
+    this.page.on('filechooser', async (fileChooser) => {
+      this.pendingFileChooser = fileChooser;
+      this.sendMessage({
+        type: 'filechooser:open',
+        multiple: fileChooser.isMultiple(),
+      });
     });
 
     // Handle WS messages from frontend
@@ -211,6 +221,25 @@ export class BrowserSession {
 
         case 'analyze': {
           await this.runAnalysis(msg.includeNonInteractive, msg.maxElements);
+          break;
+        }
+
+        case 'filechooser:setFiles': {
+          if (this.pendingFileChooser && msg.files && msg.files.length > 0) {
+            // msg.files is an array of { name, data } where data is base64
+            const filePayloads = msg.files.map((f: any) => ({
+              name: f.name,
+              mimeType: f.mimeType || 'application/octet-stream',
+              buffer: Buffer.from(f.data, 'base64'),
+            }));
+            await this.pendingFileChooser.setFiles(filePayloads);
+            this.pendingFileChooser = null;
+          }
+          break;
+        }
+
+        case 'filechooser:cancel': {
+          this.pendingFileChooser = null;
           break;
         }
 

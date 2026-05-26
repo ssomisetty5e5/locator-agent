@@ -639,6 +639,31 @@
         hideLoading();
         showPanelError('Inspect error: ' + msg.message);
         break;
+
+      case 'filechooser:open': {
+        // Create a hidden file input to let user pick files from their machine
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.multiple = msg.multiple || false;
+        fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+        fileInput.addEventListener('change', async () => {
+          const files = [];
+          for (const file of fileInput.files) {
+            const buffer = await file.arrayBuffer();
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+            files.push({ name: file.name, mimeType: file.type, data: base64 });
+          }
+          sendMsg({ type: 'filechooser:setFiles', files });
+          document.body.removeChild(fileInput);
+        });
+        fileInput.addEventListener('cancel', () => {
+          sendMsg({ type: 'filechooser:cancel' });
+          document.body.removeChild(fileInput);
+        });
+        fileInput.click();
+        break;
+      }
     }
   }
 
@@ -813,6 +838,11 @@
       return;
     }
 
+    // Allow Ctrl+V / Cmd+V to pass through so the 'paste' event fires
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+      return; // Don't preventDefault — let browser trigger paste event
+    }
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -835,6 +865,20 @@
       sendMsg({ type: 'key:press', key });
     }
   });
+
+  // ── Handle paste: read local clipboard and type into remote browser ──
+  viewportDiv.addEventListener('paste', (e) => {
+    if (document.activeElement === urlInput) return;
+    if (!connected) return;
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (text) {
+      sendMsg({ type: 'key:type', text });
+    }
+  });
+
+  // ── Handle copy: Ctrl+C in the remote browser, get selected text back ──
+  // (Copy from remote is handled by the key:combo which sends Ctrl+C to Playwright)
 
   // We don't need keyup — Playwright's keyboard.press() handles down+up atomically.
   // Suppressing keyup prevents duplicate actions.
