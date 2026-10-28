@@ -4,7 +4,7 @@
 // for a given DiscoveredElement.
 // ============================================================
 
-import { DiscoveredElement, LocatorResult, ILocatorStrategy } from '../types';
+import { DiscoveredElement, LocatorResult, ILocatorStrategy, IFrameworkAdapter } from '../types';
 import {
   TestIdStrategy,
   AriaRoleStrategy,
@@ -17,9 +17,11 @@ import {
   NameStrategy,
   PlaceholderStrategy,
 } from './strategies';
+import { WebdriverIOAdapter } from './adapters';
 
 export class LocatorGenerator {
   private strategies: ILocatorStrategy[];
+  private adapters: IFrameworkAdapter[];
 
   constructor() {
     this.strategies = [
@@ -34,27 +36,47 @@ export class LocatorGenerator {
       new NameStrategy(),
       new PlaceholderStrategy(),
     ];
+
+    // Framework adapters translate the base locators above into other
+    // frameworks' syntax. Add a new framework by writing one adapter and
+    // registering it here — no strategy files need to change.
+    this.adapters = [new WebdriverIOAdapter()];
   }
 
   /**
    * Generate all possible locators for a single element.
    */
   generate(element: DiscoveredElement): LocatorResult[] {
-    const allLocators: LocatorResult[] = [];
+    const baseLocators: LocatorResult[] = [];
 
     for (const strategy of this.strategies) {
       try {
         const locators = strategy.generate(element);
-        allLocators.push(...locators);
+        baseLocators.push(...locators);
       } catch (err) {
         // Skip failing strategy, don't crash
         console.warn(`Strategy ${strategy.name} failed for element ${element.uid}:`, err);
       }
     }
 
-    // Deduplicate by value
+    // Run every base locator through each registered framework adapter to
+    // produce additional framework-specific variants.
+    const adaptedLocators: LocatorResult[] = [];
+    for (const adapter of this.adapters) {
+      for (const loc of baseLocators) {
+        try {
+          const result = adapter.adapt(loc, element);
+          if (!result) continue;
+          adaptedLocators.push(...(Array.isArray(result) ? result : [result]));
+        } catch (err) {
+          console.warn(`Adapter ${adapter.framework} failed for element ${element.uid}:`, err);
+        }
+      }
+    }
+
+    // Deduplicate by strategy + framework + value
     const seen = new Set<string>();
-    return allLocators.filter((loc) => {
+    return [...baseLocators, ...adaptedLocators].filter((loc) => {
       const key = `${loc.strategy}::${loc.framework}::${loc.value}`;
       if (seen.has(key)) return false;
       seen.add(key);

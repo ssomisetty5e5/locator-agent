@@ -4,6 +4,7 @@
 // ============================================================
 
 import { LocatorResult, DiscoveredElement, LocatorStrategy } from '../types';
+import { findUnstableTokens } from '../util/stability';
 
 /**
  * Base scores per strategy (higher = more robust & stable).
@@ -17,7 +18,6 @@ const STRATEGY_BASE_SCORES: Record<LocatorStrategy, number> = {
   css: 55,
   shadowPiercingCss: 50,
   xpath: 40,
-  nthChild: 20,
   name: 65,
   placeholder: 75,
 };
@@ -67,6 +67,12 @@ export class LocatorRanker {
       reasons.push('+3 Playwright semantic API');
     }
 
+    // Bonus for WebdriverIO semantic selectors (aria/name or text match)
+    if (locator.framework === 'webdriverio' && /^\$\((['"])(aria\/|=|\*=)/.test(locator.value)) {
+      score += 3;
+      reasons.push('+3 WebdriverIO semantic selector');
+    }
+
     // Bonus for JavaScript shadow-piercing (works in DevTools + Selenium)
     if (locator.framework === 'javascript' && locator.strategy === 'shadowPiercingCss') {
       score += 5;
@@ -81,6 +87,8 @@ export class LocatorRanker {
       } else if (locator.framework === 'javascript' && locator.value.includes('.shadowRoot.querySelector')) {
         chainLevels = (locator.value.match(/\.shadowRoot\.querySelector/g) || []).length + 1;
       } else if (locator.framework === 'css' && locator.value.includes(' >>> ')) {
+        chainLevels = locator.value.split(' >>> ').length;
+      } else if (locator.framework === 'webdriverio' && locator.value.includes(' >>> ')) {
         chainLevels = locator.value.split(' >>> ').length;
       }
       if (chainLevels > 0 && chainLevels <= 2) {
@@ -164,6 +172,23 @@ export class LocatorRanker {
       // Could not validate uniqueness — mild penalty (prefer validated locators)
       score -= 5;
       reasons.push('-5 uniqueness unverified');
+    }
+
+    // ── Identity: does it find *this* element? ───
+    if (locator.resolvesToTarget === false && (locator.matchCount ?? 0) > 0) {
+      score -= 40;
+      reasons.push('-40 matches a different element than the target');
+    }
+
+    // ── Stability: ids/classes that look auto-generated ───
+    // Skip aria/text-style locators: their value is a label, not a selector.
+    if (!/^getBy/.test(locator.value)) {
+      const unstable = findUnstableTokens(locator.value);
+      if (unstable.length > 0) {
+        const penalty = Math.min(30, 15 * unstable.length);
+        score -= penalty;
+        reasons.push(`-${penalty} unstable: ${unstable.slice(0, 2).join(', ')}`);
+      }
     }
 
     // Clamp between 0 and 100

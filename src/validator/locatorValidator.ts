@@ -4,7 +4,7 @@
 // uniqueness — how many elements each locator actually matches.
 // ============================================================
 
-import { Page } from 'playwright';
+import { Page, Locator } from 'playwright';
 import { LocatorResult } from '../types';
 
 /**
@@ -30,6 +30,7 @@ export class LocatorValidator {
     page: Page,
     locators: LocatorResult[],
     timeout = 500,
+    targetIndex?: number,
   ): Promise<void> {
     // Build one big evaluate call for all CSS/XPath selectors at once
     // to minimize round-trips.
@@ -63,15 +64,17 @@ export class LocatorValidator {
           `(() => {
             const cssSels = ${JSON.stringify(cssSelectors.map(s => s.selector))};
             const xpathExprs = ${JSON.stringify(xpathSelectors.map(s => s.expr))};
+            const targetIdx = ${targetIndex ?? -1};
+            const target = targetIdx >= 0 && window.__laNodes ? window.__laNodes[targetIdx] : null;
             const results = [];
 
             // CSS
             for (const sel of cssSels) {
               try {
                 const matches = document.querySelectorAll(sel);
-                results.push(matches.length);
+                results.push([matches.length, target ? Array.prototype.includes.call(matches, target) : null]);
               } catch(e) {
-                results.push(-1);
+                results.push([-1, null]);
               }
             }
 
@@ -82,30 +85,39 @@ export class LocatorValidator {
                   expr, document, null,
                   XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null
                 );
-                results.push(xr.snapshotLength);
+                let hit = null;
+                if (target) {
+                  hit = false;
+                  for (let i = 0; i < xr.snapshotLength; i++) {
+                    if (xr.snapshotItem(i) === target) { hit = true; break; }
+                  }
+                }
+                results.push([xr.snapshotLength, hit]);
               } catch(e) {
-                results.push(-1);
+                results.push([-1, null]);
               }
             }
 
             return results;
           })()`
-        ) as number[];
+        ) as [number, boolean | null][];
 
         // Map results back
         let ri = 0;
         for (const cs of cssSelectors) {
-          const count = counts[ri++];
+          const [count, hit] = counts[ri++];
           if (count >= 0) {
             locators[cs.index].matchCount = count;
             locators[cs.index].isUnique = count === 1;
+            if (hit !== null) locators[cs.index].resolvesToTarget = hit;
           }
         }
         for (const xs of xpathSelectors) {
-          const count = counts[ri++];
+          const [count, hit] = counts[ri++];
           if (count >= 0) {
             locators[xs.index].matchCount = count;
             locators[xs.index].isUnique = count === 1;
+            if (hit !== null) locators[xs.index].resolvesToTarget = hit;
           }
         }
       } catch {
@@ -118,10 +130,11 @@ export class LocatorValidator {
     // at a time, but these are fast since they don't hit the network.
     for (const pw of playwrightLocators) {
       try {
-        const count = await this.countPlaywrightLocator(page, pw.locator, timeout);
+        const { count, hit } = await this.countPlaywrightLocator(page, pw.locator, timeout, targetIndex);
         if (count >= 0) {
           locators[pw.index].matchCount = count;
           locators[pw.index].isUnique = count === 1;
+          if (hit !== null) locators[pw.index].resolvesToTarget = hit;
         }
       } catch {
         // Skip
@@ -177,6 +190,26 @@ export class LocatorValidator {
       return { type: 'css', value: `#${escaped}` };
     }
 
+    // WebdriverIO — unwrap `$('...')` / `$("...")` and classify the inner
+    // selector. Skip forms that have no direct DOM-query equivalent:
+    // "aria/Name" (accessible-name lookup), "=Text"/"*=Text" (text match),
+    // and " >>> " deep-selector chains (shadow piercing).
+    if (loc.framework === 'webdriverio') {
+      const wdioMatch = loc.value.match(/^\$\((['"])(.*)\1\)$/);
+      if (!wdioMatch) return null;
+      const inner = wdioMatch[2];
+      if (inner.startsWith('aria/') || inner.startsWith('=') || inner.startsWith('*=')) {
+        return null;
+      }
+      if (inner.includes(' >>> ')) {
+        return null;
+      }
+      if (inner.startsWith('/') || inner.startsWith('(')) {
+        return { type: 'xpath', value: inner };
+      }
+      return { type: 'css', value: inner };
+    }
+
     return null;
   }
 
@@ -188,65 +221,79 @@ export class LocatorValidator {
     page: Page,
     loc: LocatorResult,
     _timeout: number,
-  ): Promise<number> {
+    targetIndex?: number,
+  ): Promise<{ count: number; hit: boolean | null }> {
     const val = loc.value;
 
-    // Parse getByRole('button', { name: 'Submit' })
+    // JavaScript querySelector chain — execute it directly in the page
+    if (loc.strategy === 'shadowPiercingCss' && loc.framework === 'javascript' && val.startsWith('document.querySelector')) {
+      const result = (await page.evaluate(`(() => {
+        try {
+          const el = ${val};
+          const idx = ${targetIndex ?? -1};
+          const target = idx >= 0 && window.__laNodes ? window.__laNodes[idx] : null;
+          return [el ? 1 : 0, target ? el === target : null];
+        } catch(e) { return [0, null]; }
+      })()`)) as [number, boolean | null];
+      return { count: result[0], hit: result[1] };
+    }
+
+    const locator = this.buildPlaywrightLocator(page, loc);
+    if (!locator) return { count: -1, hit: null };
+
+    const count = await locator.count();
+    let hit: boolean | null = null;
+    if (targetIndex !== undefined) {
+      hit = count > 0
+        ? await locator.evaluateAll(
+            (els: any[], idx: number) => {
+              const target = (globalThis as any).__laNodes?.[idx];
+              return !!target && els.includes(target);
+            },
+            targetIndex,
+          )
+        : false;
+    }
+    return { count, hit };
+  }
+
+  /**
+   * Turn a generated Playwright-style locator string into a real Playwright
+   * Locator, or null if the string isn't one we understand.
+   */
+  private buildPlaywrightLocator(page: Page, loc: LocatorResult): Locator | null {
+    const val = loc.value;
+
+    // getByRole('button', { name: 'Submit' })
     const roleMatch = val.match(/^getByRole\('([^']+)'(?:\s*,\s*\{\s*name:\s*'([^']*)'\s*\})?\)$/);
     if (roleMatch) {
       const role = roleMatch[1];
       const name = roleMatch[2];
-      const locator = name
-        ? page.getByRole(role as any, { name })
-        : page.getByRole(role as any);
-      return await locator.count();
+      return name ? page.getByRole(role as any, { name }) : page.getByRole(role as any);
     }
 
-    // Parse getByText('...')
     const textMatch = val.match(/^getByText\('([^']*)'\)$/);
-    if (textMatch) {
-      return await page.getByText(textMatch[1]).count();
-    }
+    if (textMatch) return page.getByText(textMatch[1]);
 
-    // Parse getByLabel('...')
     const labelMatch = val.match(/^getByLabel\('([^']*)'\)$/);
-    if (labelMatch) {
-      return await page.getByLabel(labelMatch[1]).count();
-    }
+    if (labelMatch) return page.getByLabel(labelMatch[1]);
 
-    // Parse getByPlaceholder('...')
     const phMatch = val.match(/^getByPlaceholder\('([^']*)'\)$/);
-    if (phMatch) {
-      return await page.getByPlaceholder(phMatch[1]).count();
-    }
+    if (phMatch) return page.getByPlaceholder(phMatch[1]);
 
-    // Parse getByTestId('...')
     const tidMatch = val.match(/^getByTestId\('([^']*)'\)$/);
-    if (tidMatch) {
-      return await page.getByTestId(tidMatch[1]).count();
-    }
+    if (tidMatch) return page.getByTestId(tidMatch[1]);
 
     // Shadow-piercing selector (Playwright >> combinator)
     if (loc.strategy === 'shadowPiercingCss' && loc.framework === 'playwright' && val.includes(' >> ')) {
-      return await page.locator(val).count();
-    }
-
-    // JavaScript querySelector chain — execute it directly in the page
-    if (loc.strategy === 'shadowPiercingCss' && loc.framework === 'javascript' && val.startsWith('document.querySelector')) {
-      const result = await page.evaluate(`(() => {
-        try {
-          const el = ${val};
-          return el ? 1 : 0;
-        } catch(e) { return 0; }
-      })()`);
-      return result as number;
+      return page.locator(val);
     }
 
     // Generic Playwright CSS selector (no getBy prefix)
     if (loc.framework === 'playwright' && !val.startsWith('getBy')) {
-      return await page.locator(val).count();
+      return page.locator(val);
     }
 
-    return -1; // Could not parse
+    return null;
   }
 }

@@ -593,7 +593,7 @@ export class NativeBrowserSession {
       const elementAnalyses: ElementAnalysis[] = [];
       for (const el of elements) {
         const rawLocators = this.generator.generate(el);
-        await this.validator.validate(this.activePage!, rawLocators);
+        await this.validator.validate(this.activePage!, rawLocators, undefined, el.nodeIndex);
         const ranked = this.ranker.rank(rawLocators, el);
         const recommended = ranked.length > 0
           ? this.ranker.getBest(ranked)

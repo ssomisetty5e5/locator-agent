@@ -53,6 +53,7 @@ export class ElementDiscoverer {
       childCount: node.childCount,
       nthOfType: node.nthOfType,
       siblingsOfSameType: node.siblingsOfSameType,
+      nodeIndex: node.nodeIndex,
     };
   }
 }

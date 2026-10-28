@@ -4,6 +4,7 @@
 // ============================================================
 
 import { DiscoveredElement, LocatorResult, ILocatorStrategy, LocatorStrategy } from '../../types';
+import { isGeneratedClass, escapeCssAttr } from '../../util/stability';
 
 export class CssStrategy implements ILocatorStrategy {
   name: LocatorStrategy = 'css';
@@ -47,22 +48,22 @@ export class CssStrategy implements ILocatorStrategy {
 
     // name attribute
     if (element.attributes['name']) {
-      selectors.push(`${tag}[name="${element.attributes['name']}"]`);
+      selectors.push(`${tag}[name="${escapeCssAttr(element.attributes['name'])}"]`);
     }
 
     // placeholder attribute
     if (element.attributes['placeholder']) {
-      selectors.push(`${tag}[placeholder="${element.attributes['placeholder']}"]`);
+      selectors.push(`${tag}[placeholder="${escapeCssAttr(element.attributes['placeholder'])}"]`);
     }
 
     // type attribute for inputs
     if (tag === 'input' && element.attributes['type']) {
       const type = element.attributes['type'];
       if (element.attributes['name']) {
-        selectors.push(`input[type="${type}"][name="${element.attributes['name']}"]`);
+        selectors.push(`input[type="${escapeCssAttr(type)}"][name="${escapeCssAttr(element.attributes['name'])}"]`);
       }
       if (element.attributes['placeholder']) {
-        selectors.push(`input[type="${type}"][placeholder="${element.attributes['placeholder']}"]`);
+        selectors.push(`input[type="${escapeCssAttr(type)}"][placeholder="${escapeCssAttr(element.attributes['placeholder'])}"]`);
       }
     }
 
@@ -74,24 +75,24 @@ export class CssStrategy implements ILocatorStrategy {
         const parts = href.split('/');
         const lastPart = parts[parts.length - 1];
         if (lastPart && lastPart.length > 0 && lastPart.length < 50) {
-          selectors.push(`a[href$="${lastPart}"]`);
+          selectors.push(`a[href$="${escapeCssAttr(lastPart)}"]`);
         }
         if (href.length < 80) {
-          selectors.push(`a[href="${href}"]`);
+          selectors.push(`a[href="${escapeCssAttr(href)}"]`);
         }
       }
     }
 
     // title attribute
     if (element.attributes['title']) {
-      selectors.push(`${tag}[title="${element.attributes['title']}"]`);
+      selectors.push(`${tag}[title="${escapeCssAttr(element.attributes['title'])}"]`);
     }
 
     // value for buttons/inputs with static values
     if (element.attributes['value'] && (tag === 'input' || tag === 'button')) {
       const type = element.attributes['type'];
       if (type === 'submit' || type === 'button' || type === 'reset') {
-        selectors.push(`${tag}[value="${element.attributes['value']}"]`);
+        selectors.push(`${tag}[value="${escapeCssAttr(element.attributes['value'])}"]`);
       }
     }
 
@@ -114,18 +115,8 @@ export class CssStrategy implements ILocatorStrategy {
     return classAttr
       .split(/\s+/)
       .filter((c) => c.length > 0)
-      .filter((c) => !this.isGeneratedClass(c))
+      .filter((c) => !isGeneratedClass(c))
       .slice(0, 3);
-  }
-
-  private isGeneratedClass(cls: string): boolean {
-    // Skip hash/auto-generated classes (CSS modules, styled-components, etc.)
-    if (/^[a-z]{1,3}[0-9a-f]{4,}/i.test(cls)) return true;
-    if (/^css-[a-z0-9]+$/i.test(cls)) return true;
-    if (/^sc-[a-z]+$/i.test(cls)) return true;
-    if (/^_[a-z0-9]{5,}$/i.test(cls)) return true;
-    if (/^[A-Z][a-zA-Z]+-[a-zA-Z]+-[a-z0-9]{5,}$/.test(cls)) return true;
-    return false;
   }
 
   private escapeCss(s: string): string {

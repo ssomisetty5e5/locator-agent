@@ -34,6 +34,8 @@ export function getBrowserTraversalScript(): string {
       const MAX_SHADOW_DEPTH = 15;
 
       const results = [];
+      const nodeRefs = [];
+      window.__laNodes = nodeRefs;
       let shadowRootCount = 0;
       let totalElements = 0;
       const visited = new WeakSet();
@@ -210,6 +212,10 @@ export function getBrowserTraversalScript(): string {
           isInteractive: interactive
         };
 
+        // Keep a page-side handle so the validator can later check that a
+        // locator resolves to *this* element, not just to some element.
+        serialized.nodeIndex = results.length;
+        nodeRefs.push(child);
         results.push(serialized);
 
         // ── Push children onto the stack ──

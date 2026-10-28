@@ -994,6 +994,11 @@
       </div>
     </div>`;
 
+    // Low score recommendation
+    if (rec.score < 50) {
+      html += renderLowScoreSuggestion(el, rec);
+    }
+
     // All locators table
     if (analysis.locators && analysis.locators.length > 0) {
       const locRows = analysis.locators.map(l => locatorRow(l)).join('');
@@ -1070,6 +1075,7 @@
                 <button class="copy-btn" onclick="event.stopPropagation();copyText(this,'${escAttr(rec.value)}')">Copy</button>
               </div>
             </div>
+            ${rec.score < 50 ? renderLowScoreSuggestion(el, rec) : ''}
             <table class="loc-table">
               <thead><tr><th>Strategy</th><th>Locator</th><th>Score</th><th></th></tr></thead>
               <tbody>${locRows}</tbody>
@@ -1118,6 +1124,61 @@
     if (l.matchCount === 0) return '<span style="display:inline-block;font-size:0.65rem;padding:1px 5px;border-radius:8px;background:var(--red-bg);color:var(--red);font-weight:700;" title="Matches 0 elements">✗ 0</span>';
     return '<span style="display:inline-block;font-size:0.65rem;padding:1px 5px;border-radius:8px;background:var(--yellow-bg);color:var(--yellow);font-weight:700;" title="Not unique: matches ' + l.matchCount + ' elements">⚠ ' + l.matchCount + '</span>';
   }
+
+  function renderLowScoreSuggestion(el, rec) {
+    const suggestions = [];
+    const attrs = el.attributes || {};
+
+    if (!attrs['data-testid']) {
+      suggestions.push({
+        attr: 'data-testid',
+        example: `data-testid="${el.tag}-${attrs.id || attrs.name || el.text?.replace(/\s+/g,'-').toLowerCase().slice(0,20) || 'element'}"`,
+        reason: 'Best practice for test automation — provides a stable, unique identifier'
+      });
+    }
+    if (!attrs['aria-label'] && !attrs['role']) {
+      suggestions.push({
+        attr: 'aria-label',
+        example: `aria-label="${el.text?.slice(0,30) || 'descriptive label'}"`,
+        reason: 'Improves accessibility and enables Playwright getByLabel()'
+      });
+    }
+    if (!attrs['id']) {
+      suggestions.push({
+        attr: 'id',
+        example: `id="${el.tag}-${el.text?.replace(/\s+/g,'-').toLowerCase().slice(0,20) || 'unique-id'}"`,
+        reason: 'Provides a unique, fast CSS selector'
+      });
+    }
+    if (!attrs['name'] && (el.tag === 'input' || el.tag === 'select' || el.tag === 'textarea')) {
+      suggestions.push({
+        attr: 'name',
+        example: `name="field-name"`,
+        reason: 'Standard form field identifier'
+      });
+    }
+
+    if (suggestions.length === 0) return '';
+
+    let html = `<div style="margin-top:10px;padding:10px 12px;background:var(--yellow-bg);border:1px solid rgba(253,203,110,0.3);border-radius:var(--radius-sm);">
+      <div style="font-size:0.8rem;font-weight:700;color:var(--yellow);margin-bottom:6px;">
+        💡 Low Score (${rec.score}) — Suggested Improvements
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
+        Add one of these attributes to the element for more reliable locators:
+      </div>`;
+
+    suggestions.forEach(s => {
+      html += `<div style="margin-bottom:6px;padding:5px 8px;background:var(--surface2);border-radius:4px;">
+        <div style="font-family:var(--mono);font-size:0.72rem;color:var(--green);word-break:break-all;">${esc(s.example)}</div>
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">${esc(s.reason)}</div>
+      </div>`;
+    });
+
+    html += '</div>';
+    return html;
+  }
+
   function locatorRow(l) {
     const shortBadge = (l.scoreReason && l.scoreReason.includes('(short)'))
       ? '<span title="Shortened chain — starts from nearest unique ancestor" style="display:inline-block;font-size:0.6rem;padding:1px 5px;border-radius:6px;background:rgba(108,92,231,0.15);color:#a29bfe;font-weight:600;margin-left:3px;">⚡short</span>'

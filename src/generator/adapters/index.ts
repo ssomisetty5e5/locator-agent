@@ -1,0 +1,1 @@
+export { WebdriverIOAdapter } from './webdriverioAdapter';

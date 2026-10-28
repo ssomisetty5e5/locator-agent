@@ -4,6 +4,7 @@
 // ============================================================
 
 import { DiscoveredElement, LocatorResult, ILocatorStrategy, LocatorStrategy } from '../../types';
+import { isGeneratedId, isGeneratedClass, escapeCssAttr } from '../../util/stability';
 
 export class ShadowPiercingCssStrategy implements ILocatorStrategy {
   name: LocatorStrategy = 'shadowPiercingCss';
@@ -128,33 +129,34 @@ export class ShadowPiercingCssStrategy implements ILocatorStrategy {
     const tag = element.tag;
 
     // Prefer specific attributes
-    if (element.attributes['id'] && !this.isGeneratedId(element.attributes['id'])) {
+    if (element.attributes['id'] && !isGeneratedId(element.attributes['id'])) {
       return `#${this.escapeCssVal(element.attributes['id'])}`;
     }
     if (element.attributes['data-testid']) {
-      return `[data-testid="${element.attributes['data-testid']}"]`;
+      return `[data-testid="${escapeCssAttr(element.attributes['data-testid'])}"]`;
     }
     if (element.attributes['name']) {
-      return `${tag}[name="${element.attributes['name']}"]`;
+      return `${tag}[name="${escapeCssAttr(element.attributes['name'])}"]`;
     }
     if (element.attributes['aria-label']) {
-      return `${tag}[aria-label="${element.attributes['aria-label']}"]`;
+      return `${tag}[aria-label="${escapeCssAttr(element.attributes['aria-label'])}"]`;
     }
     if (element.attributes['label']) {
-      return `${tag}[label="${element.attributes['label']}"]`;
+      return `${tag}[label="${escapeCssAttr(element.attributes['label'])}"]`;
     }
     if (element.attributes['icon']) {
-      return `${tag}[icon="${element.attributes['icon']}"]`;
+      return `${tag}[icon="${escapeCssAttr(element.attributes['icon'])}"]`;
     }
     if (element.attributes['role']) {
-      return `${tag}[role="${element.attributes['role']}"]`;
+      return `${tag}[role="${escapeCssAttr(element.attributes['role'])}"]`;
     }
 
     // Class-based
     const cls = element.attributes['class'];
     if (cls) {
       const classes = cls.split(/\s+/)
-        .filter((c) => c.length > 0 && !c.match(/^[a-z]{1,3}[0-9a-f]{4,}/i))
+        .filter((c) => c.length > 0 && !isGeneratedClass(c))
+        .map((c) => this.escapeCssVal(c))
         .slice(0, 2);
       if (classes.length > 0) {
         return `${tag}.${classes.join('.')}`;
@@ -168,9 +170,4 @@ export class ShadowPiercingCssStrategy implements ILocatorStrategy {
     return s.replace(/([^\w-])/g, '\\$1');
   }
 
-  private isGeneratedId(id: string): boolean {
-    if (/^:r[0-9a-z]+:$/.test(id)) return true;
-    if (/^[a-f0-9]{8,}$/i.test(id)) return true;
-    return false;
-  }
 }

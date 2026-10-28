@@ -53,7 +53,7 @@ export class LocatorAgent {
         const rawLocators = this.generator.generate(el);
 
         // Validate uniqueness against the live page
-        await this.validator.validate(loaded.page, rawLocators);
+        await this.validator.validate(loaded.page, rawLocators, undefined, el.nodeIndex);
 
         // Rank (scores now include uniqueness bonuses/penalties)
         const ranked = this.ranker.rank(rawLocators, el);

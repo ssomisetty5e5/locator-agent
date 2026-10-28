@@ -31,6 +31,9 @@ export interface SerializedNode {
   cssPathSegments: string[];
   boundingBox: BoundingBox | null;
   isInteractive: boolean;
+
+  /** Index of this node in the page-side `window.__laNodes` array (set by the traverser) */
+  nodeIndex?: number;
 }
 
 /**
@@ -81,6 +84,9 @@ export interface DiscoveredElement {
 
   /** Total siblings of the same tag */
   siblingsOfSameType: number;
+
+  /** Index into the page-side `window.__laNodes` array, used to verify locators hit this exact element */
+  nodeIndex?: number;
 }
 
 /**
@@ -95,14 +101,13 @@ export type LocatorStrategy =
   | 'css'
   | 'shadowPiercingCss'
   | 'xpath'
-  | 'nthChild'
   | 'name'
   | 'placeholder';
 
 /**
  * Framework-specific output format.
  */
-export type FrameworkFormat = 'playwright' | 'selenium' | 'css' | 'xpath' | 'generic' | 'javascript';
+export type FrameworkFormat = 'playwright' | 'selenium' | 'css' | 'xpath' | 'generic' | 'javascript' | 'webdriverio';
 
 /**
  * A single locator strategy result.
@@ -128,6 +133,14 @@ export interface LocatorResult {
 
   /** Whether this locator uniquely identifies exactly one element */
   isUnique?: boolean;
+
+  /**
+   * Whether the elements this locator matches include the element it was
+   * generated for. Only set when the validator could resolve the target
+   * (i.e. the element came from a page traversal). `false` means the
+   * locator finds *something else* and must not be trusted.
+   */
+  resolvesToTarget?: boolean;
 }
 
 /**
@@ -225,4 +238,26 @@ export interface ILocatorStrategy {
 
   /** Generate locators for a given element */
   generate(element: DiscoveredElement): LocatorResult[];
+}
+
+/**
+ * Interface for a framework adapter.
+ *
+ * Adapters translate already-generated, framework-neutral locator results
+ * (css selectors, xpath expressions, or Playwright semantic calls) into a
+ * *different* test automation framework's syntax. This lets new frameworks
+ * be added as a single new adapter file, without touching any of the
+ * existing locator strategies (which stay focused on *finding* good
+ * selectors, not on rendering them for every possible framework).
+ */
+export interface IFrameworkAdapter {
+  /** The framework this adapter produces output for */
+  framework: FrameworkFormat;
+
+  /**
+   * Attempt to translate a single generated locator into this adapter's
+   * framework. Return `null` if this locator can't/shouldn't be translated
+   * (e.g. a strategy that has no equivalent in the target framework).
+   */
+  adapt(locator: LocatorResult, element: DiscoveredElement): LocatorResult | LocatorResult[] | null;
 }

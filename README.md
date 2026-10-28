@@ -7,7 +7,7 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 ## ✨ Features
 
 - **Shadow DOM Piercing** — Iterative traversal that walks through all Shadow DOM boundaries, no matter how deep
-- **11 Locator Strategies** — TestID, Aria Role, Aria Label, Text, ID, Name, Placeholder, CSS, Shadow-Piercing CSS, XPath, and JavaScript `querySelector` chains
+- **10 Locator Strategies** — TestID, Aria Role, Aria Label, Text, ID, Name, Placeholder, CSS, Shadow-Piercing CSS, and XPath (Shadow-Piercing CSS also emits JavaScript `querySelector` chains)
 - **Multi-Framework Output** — Each locator tagged with its framework: Playwright (`PW`), Selenium (`Se`), CSS, XPath, JavaScript (`JS`)
 - **Robustness Scoring** — Every locator scored 0–100 for stability, with chain depth and uniqueness factored in
 - **Uniqueness Validation** — Live validation against the page: each locator shows its match count (✓1, ⚠2, ✗0)
@@ -15,7 +15,7 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 - **Interactive Inspect Mode** — Hover over elements, click to generate locators in real time
 - **3 Web UIs** — Simple URL analyzer, embedded headless browser, and native CDP browser mode
 - **CLI & REST API** — Terminal tool and HTTP endpoint for CI/CD integration
-- **17 Unit Tests** — Full test suite covering discovery, generation, ranking, and end-to-end analysis
+- **57 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
 
 ---
 
@@ -145,7 +145,7 @@ Or analyze raw HTML:
 | 8 | CSS | `div.card > button.primary` | CSS | ★★★ |
 | 9 | Shadow CSS | `my-host >> inner-host >> button` | PW, JS, CSS | ★★★ |
 | 10 | XPath | `//button[text()='Submit']` | XPath | ★★ |
-| 11 | JS Chain | `document.querySelector('host').shadowRoot.querySelector('btn')` | JS | ★★ |
+| 9b | JS Chain (variant of Shadow CSS) | `document.querySelector('host').shadowRoot.querySelector('btn')` | JS | ★★ |
 
 ---
 
@@ -164,7 +164,7 @@ locator-agent/
 │   ├── traverser/             # Iterative Shadow DOM piercing traversal
 │   ├── discoverer/            # Interactive element discovery + UID assignment
 │   ├── generator/             # Locator generation engine
-│   │   └── strategies/        # 11 individual strategy implementations
+│   │   └── strategies/        # 10 individual strategy implementations
 │   ├── ranker/                # Robustness scoring + ranking
 │   ├── validator/             # Live uniqueness validation (match counting)
 │   ├── browser/               # Live browser sessions
@@ -173,7 +173,7 @@ locator-agent/
 │   ├── api/                   # Express REST API + WebSocket server
 │   └── cli/                   # Commander.js CLI tool
 ├── tests/
-│   └── agent.test.ts          # 17 unit tests (Vitest)
+│   └── agent.test.ts          # agent, stability and live-validation tests (Vitest)
 ├── package.json
 └── tsconfig.json
 ```
@@ -190,7 +190,7 @@ locator-agent/
                                                    │
                     ┌───────────────┐    ┌─────────▼─────────┐
                     │  Locator      │◂───│  LocatorGenerator  │
-                    │  Validator    │    │  (11 strategies)   │
+                    │  Validator    │    │  (10 strategies)   │
                     └───────┬───────┘    └───────────────────┘
                             │
                     ┌───────▼───────┐

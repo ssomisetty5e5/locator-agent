@@ -4,6 +4,7 @@
 // ============================================================
 
 import { DiscoveredElement, LocatorResult, ILocatorStrategy, LocatorStrategy } from '../../types';
+import { isGeneratedId } from '../../util/stability';
 
 export class XPathStrategy implements ILocatorStrategy {
   name: LocatorStrategy = 'xpath';
@@ -13,7 +14,7 @@ export class XPathStrategy implements ILocatorStrategy {
     const tag = element.tag;
 
     // Attribute-based XPaths
-    if (element.attributes['id'] && !this.isGeneratedId(element.attributes['id'])) {
+    if (element.attributes['id'] && !isGeneratedId(element.attributes['id'])) {
       results.push(this.makeResult(`//${tag}[@id='${element.attributes['id']}']`));
     }
 
@@ -98,13 +99,6 @@ export class XPathStrategy implements ILocatorStrategy {
     const xpath = '/' + xpathParts.join('/');
     // Only return if reasonably short
     return xpath.length < 250 ? xpath : null;
-  }
-
-  private isGeneratedId(id: string): boolean {
-    if (/^:r[0-9a-z]+:$/.test(id)) return true;
-    if (/^[a-f0-9]{8,}$/i.test(id)) return true;
-    if (/^\d+$/.test(id)) return true;
-    return false;
   }
 
   private escapeXPath(s: string): string {

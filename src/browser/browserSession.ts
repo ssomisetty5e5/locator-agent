@@ -541,7 +541,7 @@ export class BrowserSession {
         const rawLocators = this.generator.generate(el);
 
         // Validate uniqueness against the live page
-        await this.validator.validate(this.page!, rawLocators);
+        await this.validator.validate(this.page!, rawLocators, undefined, el.nodeIndex);
 
         // Rank (now includes uniqueness bonuses/penalties)
         const ranked = this.ranker.rank(rawLocators, el);
