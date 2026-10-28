@@ -8,6 +8,9 @@ import { Page, Frame, Locator } from 'playwright';
 
 /** Anything that can resolve locators: the main page or one of its iframes. */
 type QueryContext = Page | Frame;
+
+/** A context, or a Locator narrowed to an ancestor (scoped locators). */
+type LocatorRoot = QueryContext | Locator;
 import { LocatorResult } from '../types';
 
 /**
@@ -128,6 +131,23 @@ export class LocatorValidator {
       }
     }
 
+    // Translated locators (e.g. WebdriverIO `$('aria/Save')`) that couldn't be
+    // run directly inherit the result of the locator they were derived from,
+    // so an unverified translation can't outrank a source known to be ambiguous.
+    // Done after the Playwright pass below.
+    const propagateDerived = () => {
+      const byKey = new Map<string, LocatorResult>();
+      for (const l of locators) byKey.set(`${l.strategy}::${l.framework}::${l.value}`, l);
+      for (const l of locators) {
+        if (!l.derivedFrom || l.matchCount !== undefined) continue;
+        const src = byKey.get(l.derivedFrom);
+        if (!src || src.matchCount === undefined) continue;
+        l.matchCount = src.matchCount;
+        l.isUnique = src.isUnique;
+        if (src.resolvesToTarget !== undefined) l.resolvesToTarget = src.resolvesToTarget;
+      }
+    };
+
     // ── Playwright semantic locators (getByRole, getByText, etc.) ─
     // Use Playwright's own locator().count() API — must be done one
     // at a time, but these are fast since they don't hit the network.
@@ -143,6 +163,8 @@ export class LocatorValidator {
         // Skip
       }
     }
+
+    propagateDerived();
   }
 
   /**
@@ -152,6 +174,11 @@ export class LocatorValidator {
   private extractQueryableSelector(
     loc: LocatorResult,
   ): { type: 'css' | 'xpath' | 'playwright' | 'playwright-locator' | 'js-chain'; value: string } | null {
+    // Scoped locator (ancestor + inner) — built from its structured form
+    if (loc.scope) {
+      return { type: 'playwright-locator', value: loc.value };
+    }
+
     // Shadow-piercing CSS (>>> or >>) — must use Playwright locator API
     if (loc.strategy === 'shadowPiercingCss') {
       if (loc.framework === 'playwright' && loc.value.includes(' >> ')) {
@@ -264,8 +291,25 @@ export class LocatorValidator {
    * Turn a generated Playwright-style locator string into a real Playwright
    * Locator, or null if the string isn't one we understand.
    */
-  private buildPlaywrightLocator(page: QueryContext, loc: LocatorResult): Locator | null {
+  private buildPlaywrightLocator(page: LocatorRoot, loc: LocatorResult): Locator | null {
+    // Scoped: narrow to the ancestor first, then resolve the inner expression inside it
+    if (loc.scope) {
+      let scoped = (page as QueryContext).locator(loc.scope.css);
+      if (loc.scope.hasText) scoped = scoped.filter({ hasText: loc.scope.hasText });
+      return this.buildPlaywrightLocator(scoped, {
+        ...loc,
+        scope: undefined,
+        strategy: 'css',
+        framework: 'playwright',
+        value: loc.scope.inner,
+      });
+    }
+
     const val = loc.value;
+
+    // locator('css') — plain selector written with the same quoting the scoped generator uses
+    const cssMatch = val.match(/^locator\('((?:\\.|[^'\\])*)'\)$/);
+    if (cssMatch) return page.locator(cssMatch[1].replace(/\\(.)/g, '$1'));
 
     // getByRole('button', { name: 'Submit' })
     const roleMatch = val.match(/^getByRole\('([^']+)'(?:\s*,\s*\{\s*name:\s*'([^']*)'\s*\})?\)$/);

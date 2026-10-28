@@ -110,6 +110,7 @@ export type LocatorStrategy =
   | 'css'
   | 'shadowPiercingCss'
   | 'xpath'
+  | 'scoped'
   | 'name'
   | 'placeholder';
 
@@ -157,6 +158,46 @@ export interface LocatorResult {
    * get a Playwright expression that includes the `frameLocator(...)` chain.
    */
   framePath?: string[];
+
+  /**
+   * Set on `scoped` locators: the element is found inside a distinguishing
+   * ancestor. `value` is the readable chain; this is the structured form the
+   * validator uses to build the real Playwright locator.
+   */
+  scope?: ScopeSpec;
+
+  /**
+   * Set on locators translated by a framework adapter: the `strategy::framework::value`
+   * key of the locator they were derived from. Lets the validator copy the source's
+   * match count when the translated form can't be executed directly.
+   */
+  derivedFrom?: string;
+}
+
+/**
+ * Structured description of a scoped locator:
+ * `page.locator(css)[.filter({ hasText })].<inner>`.
+ */
+export interface ScopeSpec {
+  /** CSS selector of the ancestor container, e.g. `tr` or `[data-testid="card-7"]` */
+  css: string;
+  /** Optional text that distinguishes this ancestor from its siblings */
+  hasText?: string;
+  /** Playwright expression for the target relative to the ancestor, e.g. `getByRole('button', { name: 'Delete' })` */
+  inner: string;
+}
+
+/**
+ * What the page-side probe reports about one ancestor of an element.
+ */
+export interface AncestorInfo {
+  tag: string;
+  id: string;
+  testId: string;
+  ariaLabel: string;
+  role: string;
+  /** Short, distinct text snippets inside the ancestor but outside the target */
+  texts: string[];
 }
 
 /**

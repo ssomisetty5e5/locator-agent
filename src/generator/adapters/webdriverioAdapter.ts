@@ -15,6 +15,9 @@ export class WebdriverIOAdapter implements IFrameworkAdapter {
   framework: 'webdriverio' = 'webdriverio';
 
   adapt(locator: LocatorResult, _element: DiscoveredElement): LocatorResult | LocatorResult[] | null {
+    // Scoped locators are chained Playwright expressions with no `$()` equivalent
+    if (locator.strategy === 'scoped') return null;
+
     switch (locator.framework) {
       case 'css':
         return this.fromCss(locator);

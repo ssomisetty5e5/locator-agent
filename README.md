@@ -10,6 +10,7 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 - **10 Locator Strategies** — TestID, Aria Role, Aria Label, Text, ID, Name, Placeholder, CSS, Shadow-Piercing CSS, and XPath (Shadow-Piercing CSS also emits JavaScript `querySelector` chains)
 - **iframe Support** — Elements inside (nested, cross-origin) iframes are discovered and validated within their own frame; each locator carries its `framePath`
 - **Authenticated Pages** — Reuse a Playwright `storageState` file (`--storage-state` / `storageState` API field) to analyze logged-in pages
+- **Scoped Locators** — When an element repeats (a "Delete" button in every row), locators are scoped to a distinguishing ancestor, e.g. `locator('tr').filter({ hasText: 'Invoice 1042' }).getByRole('button', { name: 'Delete' })`, and only kept if they match exactly that element
 - **Multi-Framework Output** — Each locator tagged with its framework: Playwright (`PW`), Selenium (`Se`), CSS, XPath, JavaScript (`JS`)
 - **Robustness Scoring** — Every locator scored 0–100 for stability, with chain depth and uniqueness factored in
 - **Uniqueness Validation** — Live validation against the page: each locator shows its match count (✓1, ⚠2, ✗0)
@@ -17,7 +18,7 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 - **Interactive Inspect Mode** — Hover over elements, click to generate locators in real time
 - **3 Web UIs** — Simple URL analyzer, embedded headless browser, and native CDP browser mode
 - **CLI & REST API** — Terminal tool and HTTP endpoint for CI/CD integration
-- **67 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
+- **76 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
 
 ---
 

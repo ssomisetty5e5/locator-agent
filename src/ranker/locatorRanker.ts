@@ -18,6 +18,7 @@ const STRATEGY_BASE_SCORES: Record<LocatorStrategy, number> = {
   css: 55,
   shadowPiercingCss: 50,
   xpath: 40,
+  scoped: 78,
   name: 65,
   placeholder: 75,
 };
@@ -182,7 +183,7 @@ export class LocatorRanker {
 
     // ── Stability: ids/classes that look auto-generated ───
     // Skip aria/text-style locators: their value is a label, not a selector.
-    if (!/^getBy/.test(locator.value)) {
+    if (!/^getBy/.test(locator.value) && locator.strategy !== 'scoped') {
       const unstable = findUnstableTokens(locator.value);
       if (unstable.length > 0) {
         const penalty = Math.min(30, 15 * unstable.length);

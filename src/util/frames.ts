@@ -29,7 +29,8 @@ export function formatWithFrames(loc: LocatorResult): string {
   if (!path || path.length === 0) return loc.value;
 
   if (loc.framework === 'playwright') {
-    const rest = loc.value.startsWith('getBy') ? loc.value : `locator(${JSON.stringify(loc.value)})`;
+    const isExpression = loc.value.startsWith('getBy') || loc.value.startsWith('locator(');
+    const rest = isExpression ? loc.value : `locator(${JSON.stringify(loc.value)})`;
     return `page.${playwrightFramePrefix(path)}.${rest}`;
   }
   return `/* in iframe: ${path.join(' > ')} */ ${loc.value}`;

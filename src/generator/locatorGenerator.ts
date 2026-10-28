@@ -67,7 +67,9 @@ export class LocatorGenerator {
         try {
           const result = adapter.adapt(loc, element);
           if (!result) continue;
-          adaptedLocators.push(...(Array.isArray(result) ? result : [result]));
+          const adapted = Array.isArray(result) ? result : [result];
+          const sourceKey = `${loc.strategy}::${loc.framework}::${loc.value}`;
+          adaptedLocators.push(...adapted.map((a) => ({ ...a, derivedFrom: sourceKey })));
         } catch (err) {
           console.warn(`Adapter ${adapter.framework} failed for element ${element.uid}:`, err);
         }
