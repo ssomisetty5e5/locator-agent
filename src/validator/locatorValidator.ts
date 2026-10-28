@@ -4,7 +4,10 @@
 // uniqueness — how many elements each locator actually matches.
 // ============================================================
 
-import { Page, Locator } from 'playwright';
+import { Page, Frame, Locator } from 'playwright';
+
+/** Anything that can resolve locators: the main page or one of its iframes. */
+type QueryContext = Page | Frame;
 import { LocatorResult } from '../types';
 
 /**
@@ -27,7 +30,7 @@ export class LocatorValidator {
    * @param timeout   Max ms to spend per locator (default 500)
    */
   async validate(
-    page: Page,
+    page: QueryContext,
     locators: LocatorResult[],
     timeout = 500,
     targetIndex?: number,
@@ -218,7 +221,7 @@ export class LocatorValidator {
    * by invoking the actual Playwright locator API.
    */
   private async countPlaywrightLocator(
-    page: Page,
+    page: QueryContext,
     loc: LocatorResult,
     _timeout: number,
     targetIndex?: number,
@@ -261,7 +264,7 @@ export class LocatorValidator {
    * Turn a generated Playwright-style locator string into a real Playwright
    * Locator, or null if the string isn't one we understand.
    */
-  private buildPlaywrightLocator(page: Page, loc: LocatorResult): Locator | null {
+  private buildPlaywrightLocator(page: QueryContext, loc: LocatorResult): Locator | null {
     const val = loc.value;
 
     // getByRole('button', { name: 'Submit' })

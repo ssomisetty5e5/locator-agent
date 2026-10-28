@@ -9,6 +9,7 @@ import chalk from 'chalk';
 import Table from 'cli-table3';
 import { LocatorAgent } from '../agent';
 import { AgentInput, ElementAnalysis, PageAnalysis } from '../types';
+import { formatWithFrames } from '../util/frames';
 
 const program = new Command();
 
@@ -26,6 +27,7 @@ program
   .option('-a, --all', 'Include non-interactive elements', false)
   .option('-m, --max <number>', 'Maximum elements to return', '50')
   .option('-t, --timeout <ms>', 'Page load timeout in ms', '30000')
+  .option('-s, --storage-state <path>', 'Playwright storageState JSON to reuse a logged-in session')
   .option('-j, --json', 'Output as JSON', false)
   .option('--top <n>', 'Show top N locators per element', '3')
   .action(async (opts) => {
@@ -41,6 +43,7 @@ program
       includeNonInteractive: opts.all,
       maxElements: parseInt(opts.max, 10),
       timeout: parseInt(opts.timeout, 10),
+      storageState: opts.storageState,
     };
 
     const agent = new LocatorAgent();
@@ -72,6 +75,7 @@ function printResults(result: PageAnalysis, topN: number): void {
   console.log(`  ${chalk.bold('DOM Elements:')} ${result.totalDomElements}`);
   console.log(`  ${chalk.bold('Interactive:')}  ${result.interactiveElementsFound}`);
   console.log(`  ${chalk.bold('Shadow Roots:')} ${result.shadowRootsPierced}`);
+  console.log(`  ${chalk.bold('Frames:')}       ${result.framesAnalyzed ?? 1}`);
   console.log('');
 
   if (result.elements.length === 0) {
@@ -98,9 +102,13 @@ function printResults(result: PageAnalysis, topN: number): void {
       console.log(`  ${chalk.magenta(`Shadow DOM depth: ${el.shadowDepth} | hosts: ${el.shadowHostChain.join(' → ')}`)}`);
     }
 
+    if (el.framePath && el.framePath.length > 0) {
+      console.log(`  ${chalk.magenta(`Inside iframe: ${el.framePath.join(' → ')}`)}`);
+    }
+
     // Recommended
     const rec = analysis.recommended;
-    console.log(`  ${chalk.green.bold('★ Recommended:')} [${rec.strategy}/${rec.framework}] ${chalk.white(rec.value)} ${chalk.gray(`(score: ${rec.score})`)}`);
+    console.log(`  ${chalk.green.bold('★ Recommended:')} [${rec.strategy}/${rec.framework}] ${chalk.white(formatWithFrames(rec))} ${chalk.gray(`(score: ${rec.score})`)}`);
 
     // Top N alternatives
     const alternatives = analysis.locators
@@ -110,7 +118,7 @@ function printResults(result: PageAnalysis, topN: number): void {
     if (alternatives.length > 0) {
       console.log(`  ${chalk.yellow('  Alternatives:')}`);
       alternatives.forEach((loc) => {
-        console.log(`    ${chalk.gray(`[${loc.strategy}/${loc.framework}]`)} ${loc.value} ${chalk.gray(`(score: ${loc.score})`)}`);
+        console.log(`    ${chalk.gray(`[${loc.strategy}/${loc.framework}]`)} ${formatWithFrames(loc)} ${chalk.gray(`(score: ${loc.score})`)}`);
       });
     }
 

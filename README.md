@@ -8,6 +8,8 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 
 - **Shadow DOM Piercing** — Iterative traversal that walks through all Shadow DOM boundaries, no matter how deep
 - **10 Locator Strategies** — TestID, Aria Role, Aria Label, Text, ID, Name, Placeholder, CSS, Shadow-Piercing CSS, and XPath (Shadow-Piercing CSS also emits JavaScript `querySelector` chains)
+- **iframe Support** — Elements inside (nested, cross-origin) iframes are discovered and validated within their own frame; each locator carries its `framePath`
+- **Authenticated Pages** — Reuse a Playwright `storageState` file (`--storage-state` / `storageState` API field) to analyze logged-in pages
 - **Multi-Framework Output** — Each locator tagged with its framework: Playwright (`PW`), Selenium (`Se`), CSS, XPath, JavaScript (`JS`)
 - **Robustness Scoring** — Every locator scored 0–100 for stability, with chain depth and uniqueness factored in
 - **Uniqueness Validation** — Live validation against the page: each locator shows its match count (✓1, ⚠2, ✗0)
@@ -15,7 +17,7 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 - **Interactive Inspect Mode** — Hover over elements, click to generate locators in real time
 - **3 Web UIs** — Simple URL analyzer, embedded headless browser, and native CDP browser mode
 - **CLI & REST API** — Terminal tool and HTTP endpoint for CI/CD integration
-- **57 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
+- **67 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
 
 ---
 
@@ -96,6 +98,9 @@ npm run cli -- analyze --url https://example.com --all
 
 # Output as JSON
 npm run cli -- analyze --url https://example.com --json
+
+# Analyze a logged-in page using a saved Playwright session
+npm run cli -- analyze --url https://app.example.com --storage-state ./auth.json
 ```
 
 ---

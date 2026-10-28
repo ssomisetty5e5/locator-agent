@@ -52,8 +52,13 @@ export class LocatorAgent {
       for (const el of elements) {
         const rawLocators = this.generator.generate(el);
 
+        // Elements inside iframes are validated within their own frame
+        if (el.framePath) {
+          for (const loc of rawLocators) loc.framePath = el.framePath;
+        }
+
         // Validate uniqueness against the live page
-        await this.validator.validate(loaded.page, rawLocators, undefined, el.nodeIndex);
+        await this.validator.validate(loaded.getContext(el.framePath), rawLocators, undefined, el.nodeIndex);
 
         // Rank (scores now include uniqueness bonuses/penalties)
         const ranked = this.ranker.rank(rawLocators, el);
@@ -78,6 +83,7 @@ export class LocatorAgent {
         totalDomElements: loaded.totalDomElements,
         interactiveElementsFound: elements.length,
         shadowRootsPierced: loaded.shadowRootsPierced,
+        framesAnalyzed: loaded.framesAnalyzed,
         elements: elementAnalyses,
       };
     } finally {

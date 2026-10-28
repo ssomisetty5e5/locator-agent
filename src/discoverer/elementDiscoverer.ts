@@ -54,6 +54,7 @@ export class ElementDiscoverer {
       nthOfType: node.nthOfType,
       siblingsOfSameType: node.siblingsOfSameType,
       nodeIndex: node.nodeIndex,
+      framePath: node.framePath && node.framePath.length > 0 ? node.framePath : undefined,
     };
   }
 }

@@ -4,14 +4,43 @@
 // Playwright, then runs the Shadow DOM traversal script.
 // ============================================================
 
-import { chromium, Browser, Page, BrowserContext } from 'playwright';
+import { chromium, Browser, Page, Frame } from 'playwright';
 import { AgentInput, LoadedPage, SerializedNode } from '../types';
 import { getBrowserTraversalScript, parseTraversalResult } from '../traverser/shadowDomTraverser';
+import { buildFrameSelector } from './frameSelector';
 import * as fs from 'fs';
 import * as path from 'path';
 
 const DEFAULT_TIMEOUT = 30_000;
 const DEFAULT_VIEWPORT = { width: 1920, height: 1080 };
+const MAX_FRAME_DEPTH = 5;
+
+/** Key used to look up a frame by its iframe selector path. */
+const frameKey = (framePath?: string[]): string => (framePath ?? []).join(' >>> ');
+
+/**
+ * Wait until the DOM has stopped mutating (no changes for `quietMs`),
+ * or `maxMs` has elapsed. Replaces a fixed sleep so slow component
+ * frameworks get enough time and fast pages don't wait needlessly.
+ */
+async function waitForDomSettled(page: Page, quietMs = 300, maxMs = 3000): Promise<void> {
+  try {
+    // String script: this project compiles without DOM typings
+    await page.evaluate(`new Promise((resolve) => {
+      let timer;
+      const done = () => { observer.disconnect(); clearTimeout(timer); resolve(); };
+      const observer = new MutationObserver(() => {
+        clearTimeout(timer);
+        timer = setTimeout(done, ${quietMs});
+      });
+      observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
+      timer = setTimeout(done, ${quietMs});
+      setTimeout(done, ${maxMs});
+    })`);
+  } catch {
+    // Page navigated or closed while waiting — carry on with whatever is there
+  }
+}
 
 /**
  * Result from loadWithPage — includes a live Playwright Page
@@ -22,6 +51,11 @@ export interface LoadedPageWithHandle extends LoadedPage {
   page: Page;
   /** Call this when done to close the context and release resources */
   cleanup: () => Promise<void>;
+  /**
+   * The Playwright Page or Frame in which an element lives. Pass the element's
+   * `framePath` (absent/empty = main document).
+   */
+  getContext: (framePath?: string[]) => Page | Frame;
 }
 
 export class PageLoader {
@@ -48,72 +82,13 @@ export class PageLoader {
 
   /**
    * Load a page from a URL, file path, or raw HTML string,
-   * traverse its DOM (including Shadow DOM), and return the results.
+   * traverse its DOM (including Shadow DOM and iframes), and return the results.
    */
   async load(input: AgentInput): Promise<LoadedPage> {
-    await this.launch();
-
-    const context = await this.browser!.newContext({
-      viewport: input.viewport || DEFAULT_VIEWPORT,
-      ignoreHTTPSErrors: true,
-    });
-
-    const page = await context.newPage();
-    const timeout = input.timeout || DEFAULT_TIMEOUT;
-
-    try {
-      let source = '';
-
-      if (input.url) {
-        // Load from URL
-        source = input.url;
-        await page.goto(input.url, {
-          waitUntil: 'networkidle',
-          timeout,
-        });
-      } else if (input.filePath) {
-        // Load from HTML/MHTML file
-        source = input.filePath;
-        const resolved = path.resolve(input.filePath);
-
-        if (!fs.existsSync(resolved)) {
-          throw new Error(`File not found: ${resolved}`);
-        }
-
-        const content = fs.readFileSync(resolved, 'utf-8');
-        await page.setContent(content, {
-          waitUntil: 'networkidle',
-          timeout,
-        });
-      } else if (input.html) {
-        // Load from raw HTML string
-        source = 'inline-html';
-        await page.setContent(input.html, {
-          waitUntil: 'networkidle',
-          timeout,
-        });
-      } else {
-        throw new Error('No input provided. Specify url, filePath, or html.');
-      }
-
-      // Allow any remaining JS to settle (web components, etc.)
-      await page.waitForTimeout(500);
-
-      // Run Shadow DOM traversal
-      const script = getBrowserTraversalScript();
-      const rawResult = await page.evaluate(script);
-      const parsed = parseTraversalResult(rawResult);
-
-      return {
-        source,
-        title: parsed.title,
-        nodes: parsed.nodes,
-        totalDomElements: parsed.totalElements,
-        shadowRootsPierced: parsed.shadowRootCount,
-      };
-    } finally {
-      await context.close();
-    }
+    const loaded = await this.loadWithPage(input);
+    const { page: _page, cleanup, getContext: _getContext, ...rest } = loaded;
+    await cleanup();
+    return rest;
   }
 
   /**
@@ -124,49 +99,111 @@ export class PageLoader {
   async loadWithPage(input: AgentInput): Promise<LoadedPageWithHandle> {
     await this.launch();
 
+    if (input.storageState && !fs.existsSync(path.resolve(input.storageState))) {
+      throw new Error(`Storage state file not found: ${path.resolve(input.storageState)}`);
+    }
+
     const context = await this.browser!.newContext({
       viewport: input.viewport || DEFAULT_VIEWPORT,
       ignoreHTTPSErrors: true,
+      ...(input.storageState ? { storageState: path.resolve(input.storageState) } : {}),
     });
 
-    const page = await context.newPage();
-    const timeout = input.timeout || DEFAULT_TIMEOUT;
+    try {
+      const page = await context.newPage();
+      const timeout = input.timeout || DEFAULT_TIMEOUT;
 
-    let source = '';
+      let source = '';
 
-    if (input.url) {
-      source = input.url;
-      await page.goto(input.url, { waitUntil: 'networkidle', timeout });
-    } else if (input.filePath) {
-      source = input.filePath;
-      const resolved = path.resolve(input.filePath);
-      if (!fs.existsSync(resolved)) {
-        throw new Error(`File not found: ${resolved}`);
+      if (input.url) {
+        source = input.url;
+        await page.goto(input.url, { waitUntil: 'networkidle', timeout });
+      } else if (input.filePath) {
+        source = input.filePath;
+        const resolved = path.resolve(input.filePath);
+        if (!fs.existsSync(resolved)) {
+          throw new Error(`File not found: ${resolved}`);
+        }
+        const content = fs.readFileSync(resolved, 'utf-8');
+        await page.setContent(content, { waitUntil: 'networkidle', timeout });
+      } else if (input.html) {
+        source = 'inline-html';
+        await page.setContent(input.html, { waitUntil: 'networkidle', timeout });
+      } else {
+        throw new Error('No input provided. Specify url, filePath, or html.');
       }
-      const content = fs.readFileSync(resolved, 'utf-8');
-      await page.setContent(content, { waitUntil: 'networkidle', timeout });
-    } else if (input.html) {
-      source = 'inline-html';
-      await page.setContent(input.html, { waitUntil: 'networkidle', timeout });
-    } else {
-      throw new Error('No input provided. Specify url, filePath, or html.');
+
+      // Let web components, lazy renderers and iframes finish mutating the DOM
+      await waitForDomSettled(page);
+
+      const traversal = await this.traverseAllFrames(page);
+
+      return {
+        source,
+        title: traversal.title,
+        nodes: traversal.nodes,
+        totalDomElements: traversal.totalElements,
+        shadowRootsPierced: traversal.shadowRootCount,
+        framesAnalyzed: traversal.frames.size,
+        page,
+        getContext: (framePath?: string[]) => traversal.frames.get(frameKey(framePath)) ?? page,
+        cleanup: async () => { await context.close(); },
+      };
+    } catch (err) {
+      await context.close();
+      throw err;
     }
+  }
 
-    await page.waitForTimeout(500);
-
+  /**
+   * Run the traversal script in the main frame and then in every
+   * (nested) iframe, tagging each node with the iframe path that leads to it.
+   * Frames that can't be inspected (detached, navigated away) are skipped.
+   */
+  private async traverseAllFrames(page: Page): Promise<{
+    nodes: SerializedNode[];
+    totalElements: number;
+    shadowRootCount: number;
+    title: string;
+    frames: Map<string, Frame>;
+  }> {
     const script = getBrowserTraversalScript();
-    const rawResult = await page.evaluate(script);
-    const parsed = parseTraversalResult(rawResult);
+    const nodes: SerializedNode[] = [];
+    const frames = new Map<string, Frame>();
+    let totalElements = 0;
+    let shadowRootCount = 0;
+    let title = '';
 
-    return {
-      source,
-      title: parsed.title,
-      nodes: parsed.nodes,
-      totalDomElements: parsed.totalElements,
-      shadowRootsPierced: parsed.shadowRootCount,
-      page,
-      cleanup: async () => { await context.close(); },
+    const walk = async (frame: Frame, framePath: string[], depth: number): Promise<void> => {
+      let parsed;
+      try {
+        parsed = parseTraversalResult(await frame.evaluate(script));
+      } catch {
+        return;
+      }
+
+      frames.set(frameKey(framePath), frame);
+      if (framePath.length === 0) title = parsed.title;
+      totalElements += parsed.totalElements;
+      shadowRootCount += parsed.shadowRootCount;
+      for (const node of parsed.nodes) {
+        if (framePath.length > 0) node.framePath = framePath;
+        nodes.push(node);
+      }
+
+      if (depth >= MAX_FRAME_DEPTH) return;
+      for (const child of frame.childFrames()) {
+        try {
+          const selector = await buildFrameSelector(frame, child);
+          await walk(child, [...framePath, selector], depth + 1);
+        } catch {
+          // detached or inaccessible frame — skip it
+        }
+      }
     };
+
+    await walk(page.mainFrame(), [], 0);
+    return { nodes, totalElements, shadowRootCount, title, frames };
   }
 
   /**

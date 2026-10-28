@@ -27,10 +27,10 @@ let sessionCounter = 0;
 
 /**
  * POST /analyze
- * Accepts { url, html, filePath, includeNonInteractive, maxElements, timeout }
+ * Accepts { url, html, filePath, includeNonInteractive, maxElements, timeout, storageState }
  */
 app.post('/analyze', async (req: Request, res: Response) => {
-  const { url, html, filePath, includeNonInteractive, maxElements, timeout } = req.body;
+  const { url, html, filePath, includeNonInteractive, maxElements, timeout, storageState } = req.body;
 
   if (!url && !html && !filePath) {
     res.status(400).json({
@@ -46,6 +46,7 @@ app.post('/analyze', async (req: Request, res: Response) => {
     includeNonInteractive: includeNonInteractive ?? false,
     maxElements: maxElements ?? 100,
     timeout: timeout ?? 30000,
+    storageState,
   };
 
   const agent = new LocatorAgent();
@@ -68,7 +69,7 @@ app.post('/analyze', async (req: Request, res: Response) => {
  * to elements matching a text/attribute query.
  */
 app.post('/analyze/element', async (req: Request, res: Response) => {
-  const { url, html, filePath, query, timeout } = req.body;
+  const { url, html, filePath, query, timeout, storageState } = req.body;
 
   if (!url && !html && !filePath) {
     res.status(400).json({
@@ -91,6 +92,7 @@ app.post('/analyze/element', async (req: Request, res: Response) => {
     includeNonInteractive: true,
     maxElements: 500,
     timeout: timeout ?? 30000,
+    storageState,
   };
 
   const agent = new LocatorAgent();

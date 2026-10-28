@@ -34,6 +34,12 @@ export interface SerializedNode {
 
   /** Index of this node in the page-side `window.__laNodes` array (set by the traverser) */
   nodeIndex?: number;
+
+  /**
+   * Selectors of the iframes containing this node, outermost first
+   * (e.g. ['iframe#checkout', 'iframe[name="card"]']). Empty/absent for the main document.
+   */
+  framePath?: string[];
 }
 
 /**
@@ -87,6 +93,9 @@ export interface DiscoveredElement {
 
   /** Index into the page-side `window.__laNodes` array, used to verify locators hit this exact element */
   nodeIndex?: number;
+
+  /** Iframe selectors from the main document to this element's frame (absent = main document) */
+  framePath?: string[];
 }
 
 /**
@@ -141,6 +150,13 @@ export interface LocatorResult {
    * locator finds *something else* and must not be trusted.
    */
   resolvesToTarget?: boolean;
+
+  /**
+   * Iframes the locator is relative to, outermost first. The locator `value`
+   * is written relative to the innermost frame; use `formatWithFrames()` to
+   * get a Playwright expression that includes the `frameLocator(...)` chain.
+   */
+  framePath?: string[];
 }
 
 /**
@@ -179,6 +195,9 @@ export interface PageAnalysis {
   /** Total shadow roots pierced */
   shadowRootsPierced: number;
 
+  /** Number of frames (main document + iframes) that were analyzed */
+  framesAnalyzed?: number;
+
   /** Per-element analysis */
   elements: ElementAnalysis[];
 }
@@ -207,6 +226,9 @@ export interface AgentInput {
 
   /** Viewport size */
   viewport?: { width: number; height: number };
+
+  /** Path to a Playwright storageState JSON file (cookies/localStorage) to reuse a logged-in session */
+  storageState?: string;
 }
 
 /**
@@ -227,6 +249,9 @@ export interface LoadedPage {
 
   /** Number of shadow roots pierced */
   shadowRootsPierced: number;
+
+  /** Number of frames analyzed (main document + iframes) */
+  framesAnalyzed?: number;
 }
 
 /**
