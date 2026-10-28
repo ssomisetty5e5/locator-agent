@@ -38,7 +38,11 @@ export class WebdriverIOAdapter implements IFrameworkAdapter {
 
   private fromXPath(locator: LocatorResult): LocatorResult | null {
     // WDIO auto-detects XPath when the selector starts with "/" or "(".
-    return this.wrap(locator, `$("${locator.value}")`);
+    // Use double quotes unless the expression itself contains one.
+    const quoted = locator.value.includes('"')
+      ? `'${this.escapeSingleQuotes(locator.value)}'`
+      : `"${locator.value}"`;
+    return this.wrap(locator, `$(${quoted})`);
   }
 
   private fromPlaywright(locator: LocatorResult): LocatorResult | null {

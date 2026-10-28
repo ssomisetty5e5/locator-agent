@@ -4,6 +4,7 @@
 // Analyze live URLs or HTML snapshots from the command line.
 // ============================================================
 
+import * as fs from 'fs';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import Table from 'cli-table3';
@@ -61,6 +62,67 @@ program
       printResults(result, parseInt(opts.top, 10));
     } catch (err: any) {
       console.error(chalk.red(`\n❌ Error: ${err.message}`));
+      process.exit(1);
+    } finally {
+      await agent.shutdown();
+    }
+  });
+
+program
+  .command('page-object')
+  .description('Generate a Playwright (TypeScript) page object for a page')
+  .option('-u, --url <url>', 'URL of the page')
+  .option('-f, --file <path>', 'Path to an HTML snapshot file')
+  .option('--html <html>', 'Raw HTML string')
+  .option('-n, --class-name <name>', 'Class name (default: derived from the page title)')
+  .option('-o, --out <path>', 'Write the class to this file instead of stdout')
+  .option('-m, --max <number>', 'Maximum elements to analyze', '100')
+  .option('-t, --timeout <ms>', 'Page load timeout in ms', '30000')
+  .option('-s, --storage-state <path>', 'Playwright storageState JSON to reuse a logged-in session')
+  .option('--min-score <n>', 'Skip elements whose best locator scores below this', '0')
+  .option('--import-from <module>', 'Module to import Page/Locator types from', '@playwright/test')
+  .option('--no-goto', 'Do not generate a goto() method')
+  .option('-j, --json', 'Output the full result (class, code, elements) as JSON', false)
+  .action(async (opts) => {
+    if (!opts.url && !opts.file && !opts.html) {
+      console.error(chalk.red('Error: Provide --url, --file, or --html'));
+      process.exit(1);
+    }
+
+    const agent = new LocatorAgent();
+    try {
+      // Progress goes to stderr so stdout stays clean for piping the generated code
+      console.error(chalk.cyan('Analyzing page...'));
+      const result = await agent.generatePageObject(
+        {
+          url: opts.url,
+          filePath: opts.file,
+          html: opts.html,
+          maxElements: parseInt(opts.max, 10),
+          timeout: parseInt(opts.timeout, 10),
+          storageState: opts.storageState,
+        },
+        {
+          className: opts.className,
+          importFrom: opts.importFrom,
+          minScore: parseInt(opts.minScore, 10),
+          noGoto: opts.goto === false,
+        },
+      );
+
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+      } else if (opts.out) {
+        fs.writeFileSync(opts.out, result.code, 'utf-8');
+        const unverified = result.elements.filter((e) => !e.verified).length;
+        console.error(chalk.green(`Wrote ${result.className} with ${result.elements.length} elements to ${opts.out}`));
+        if (result.skipped > 0) console.error(chalk.gray(`  ${result.skipped} element(s) skipped`));
+        if (unverified > 0) console.error(chalk.yellow(`  ${unverified} locator(s) could not be verified unique (marked TODO)`));
+      } else {
+        process.stdout.write(result.code);
+      }
+    } catch (err: any) {
+      console.error(chalk.red(`Error: ${err.message}`));
       process.exit(1);
     } finally {
       await agent.shutdown();

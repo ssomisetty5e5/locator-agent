@@ -11,6 +11,7 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 - **iframe Support** — Elements inside (nested, cross-origin) iframes are discovered and validated within their own frame; each locator carries its `framePath`
 - **Authenticated Pages** — Reuse a Playwright `storageState` file (`--storage-state` / `storageState` API field) to analyze logged-in pages
 - **Scoped Locators** — When an element repeats (a "Delete" button in every row), locators are scoped to a distinguishing ancestor, e.g. `locator('tr').filter({ hasText: 'Invoice 1042' }).getByRole('button', { name: 'Delete' })`, and only kept if they match exactly that element
+- **Page Object Generator** — Turn a page into a ready-to-use Playwright (TypeScript) class with named `Locator` properties, validated locators and iframe chains
 - **Multi-Framework Output** — Each locator tagged with its framework: Playwright (`PW`), Selenium (`Se`), CSS, XPath, JavaScript (`JS`)
 - **Robustness Scoring** — Every locator scored 0–100 for stability, with chain depth and uniqueness factored in
 - **Uniqueness Validation** — Live validation against the page: each locator shows its match count (✓1, ⚠2, ✗0)
@@ -18,7 +19,7 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 - **Interactive Inspect Mode** — Hover over elements, click to generate locators in real time
 - **3 Web UIs** — Simple URL analyzer, embedded headless browser, and native CDP browser mode
 - **CLI & REST API** — Terminal tool and HTTP endpoint for CI/CD integration
-- **76 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
+- **93 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
 
 ---
 
@@ -104,6 +105,35 @@ npm run cli -- analyze --url https://example.com --json
 npm run cli -- analyze --url https://app.example.com --storage-state ./auth.json
 ```
 
+### Generate a Page Object
+
+```bash
+# Print a Playwright page object class to stdout
+npm run cli -- page-object --url https://example.com/login
+
+# Write it to a file, with a chosen class name
+npm run cli -- page-object --url https://example.com/login -n LoginPage -o pages/LoginPage.ts
+```
+
+Output (abridged):
+
+```ts
+export class LoginPage {
+  readonly emailAddressInput: Locator;
+  readonly logInButton: Locator;
+  readonly deleteButtonInvoice1002: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.emailAddressInput = page.getByPlaceholder('Email address');
+    this.logInButton = page.getByRole('button', { name: 'Log In' });
+    this.deleteButtonInvoice1002 = page.locator('tr').filter({ hasText: 'Invoice 1002' }).getByRole('button', { name: 'Delete' });
+  }
+}
+```
+
+Each property uses the best locator that matched exactly its element during analysis. Locators that couldn't be verified are marked `// TODO`. Options: `--min-score`, `--import-from`, `--no-goto`, `--json`, `--storage-state`.
+
 ---
 
 ## 🔌 REST API
@@ -130,7 +160,9 @@ Or analyze raw HTML:
 }
 ```
 
-**Response** includes for each element:
+**POST** `http://localhost:3000/generate/page-object` — same inputs as `/analyze` plus `className`, `minScore`, `importFrom`, `noGoto`; returns `{ className, code, elements, skipped }`.
+
+**Response** (`/analyze`) includes for each element:
 - Element info (tag, attributes, text, shadow depth, host chain)
 - All generated locators with strategy, framework, score, and match count
 - Recommended locator (highest scored)

@@ -8,6 +8,7 @@ import { ElementDiscoverer } from './discoverer';
 import { LocatorGenerator } from './generator';
 import { LocatorRanker } from './ranker';
 import { LocatorValidator } from './validator';
+import { generatePageObject, GeneratedPageObject, PageObjectOptions } from './pageobject';
 import { ScopedLocatorGenerator } from './generator/scopedLocatorGenerator';
 import { getAncestorProbeScript, parseAncestors } from './discoverer/ancestorProbe';
 import type { Page, Frame } from 'playwright';
@@ -110,6 +111,14 @@ export class LocatorAgent {
     } finally {
       await loaded.cleanup();
     }
+  }
+
+  /**
+   * Analyze a page and turn the result into a Playwright (TypeScript) page object.
+   */
+  async generatePageObject(input: AgentInput, options: PageObjectOptions = {}): Promise<GeneratedPageObject> {
+    const analysis = await this.analyze(input);
+    return generatePageObject(analysis, options);
   }
 
   /**

@@ -79,3 +79,14 @@ export function findUnstableTokens(selector: string): string[] {
 
   return found;
 }
+
+/**
+ * Quote a string as an XPath 1.0 literal. XPath has no backslash escapes,
+ * so a value containing both quote kinds must be built with concat().
+ */
+export function xpathLiteral(value: string): string {
+  if (!value.includes("'")) return `'${value}'`;
+  if (!value.includes('"')) return `"${value}"`;
+  const parts = value.split("'").map((p) => `'${p}'`);
+  return `concat(${parts.join(`, "'", `)})`;
+}

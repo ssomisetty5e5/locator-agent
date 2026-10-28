@@ -64,6 +64,33 @@ app.post('/analyze', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /generate/page-object
+ * Accepts the same inputs as /analyze plus { className, minScore, importFrom, noGoto }
+ * and returns { className, code, elements, skipped }.
+ */
+app.post('/generate/page-object', async (req: Request, res: Response) => {
+  const { url, html, filePath, timeout, maxElements, storageState, className, minScore, importFrom, noGoto } = req.body;
+
+  if (!url && !html && !filePath) {
+    res.status(400).json({ error: 'Provide at least one of: url, html, filePath' });
+    return;
+  }
+
+  const agent = new LocatorAgent();
+  try {
+    const result = await agent.generatePageObject(
+      { url, html, filePath, maxElements: maxElements ?? 100, timeout: timeout ?? 30000, storageState },
+      { className, minScore, importFrom, noGoto },
+    );
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Internal server error' });
+  } finally {
+    await agent.shutdown();
+  }
+});
+
+/**
  * POST /analyze/element
  * Targeted analysis: same as /analyze but filter the output
  * to elements matching a text/attribute query.
