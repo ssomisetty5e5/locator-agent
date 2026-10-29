@@ -7,6 +7,8 @@
 
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import { WebSocket } from 'ws';
+import { NetworkPolicy } from '../security/guards';
+import { FilteringProxy, startFilteringProxy } from '../security/filteringProxy';
 import { getBrowserTraversalScript, parseTraversalResult } from '../traverser/shadowDomTraverser';
 import { ElementDiscoverer } from '../discoverer';
 import { LocatorGenerator } from '../generator';
@@ -33,6 +35,7 @@ export class BrowserSession {
   id: string;
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
+  private proxy: FilteringProxy | null = null;
   private page: Page | null = null;
   private ws: WebSocket | null = null;
   private frameTimer: ReturnType<typeof setInterval> | null = null;
@@ -47,7 +50,7 @@ export class BrowserSession {
   private validator = new LocatorValidator();
   private pendingFileChooser: any = null;
 
-  constructor(id: string) {
+  constructor(id: string, private networkPolicy?: NetworkPolicy) {
     this.id = id;
   }
 
@@ -57,8 +60,14 @@ export class BrowserSession {
   async start(ws: WebSocket, startUrl?: string): Promise<void> {
     this.ws = ws;
 
+    // A restrictive policy sends all of this browser's traffic through a filtering proxy
+    if (this.networkPolicy && !this.networkPolicy.allowPrivateNetwork) {
+      this.proxy = await startFilteringProxy(this.networkPolicy);
+    }
+
     this.browser = await chromium.launch({
       headless: true,
+      ...(this.proxy ? { proxy: { server: this.proxy.url, bypass: '<-loopback>' } } : {}),
       args: [
         '--disable-blink-features=AutomationControlled',
         '--no-sandbox',
@@ -594,6 +603,10 @@ export class BrowserSession {
       this.browser = null;
     }
     this.page = null;
+    if (this.proxy) {
+      await this.proxy.close().catch(() => {});
+      this.proxy = null;
+    }
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.close();
     }

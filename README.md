@@ -19,7 +19,7 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 - **Interactive Inspect Mode** — Hover over elements, click to generate locators in real time
 - **3 Web UIs** — Simple URL analyzer, embedded headless browser, and native CDP browser mode
 - **CLI & REST API** — Terminal tool and HTTP endpoint for CI/CD integration
-- **119 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
+- **198 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
 
 ---
 
@@ -192,6 +192,32 @@ Or analyze raw HTML:
 - Element info (tag, attributes, text, shadow depth, host chain)
 - All generated locators with strategy, framework, score, and match count
 - Recommended locator (highest scored)
+
+### Running the server safely
+
+The server drives a real browser and can read files, so it is locked down by default. With no configuration it:
+
+- listens on `127.0.0.1` only, and rejects requests whose `Host` is not a loopback name (blocks DNS rebinding);
+- rejects cross-site browser requests and WebSocket handshakes (`Origin` must be the server itself);
+- **disables `filePath` and `storageState`** until you set `LA_ROOT` (they must then stay inside that directory; `..` and symlinks that escape are refused);
+- accepts only `http(s)` URLs, and clamps `timeout` (≤ 120 s) and `maxElements` (≤ 1000);
+- allows 4 analyses at once, then answers `429`.
+
+When the server is bound beyond loopback, or `LA_ALLOW_PRIVATE_NETWORK=0`, every connection the browser makes (the page, each redirect hop, images, scripts, WebSockets) goes through a built-in filtering proxy that refuses loopback, private, link-local (cloud metadata) and other non-public addresses, and connects to the address it checked, so redirects and DNS rebinding cannot reach internal hosts.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LA_HOST` | `127.0.0.1` | Bind address. Use `0.0.0.0` only together with `LA_API_TOKEN` |
+| `PORT` | `3000` | Port |
+| `LA_ROOT` | unset | Directory that `filePath` / `storageState` must stay inside; unset disables both |
+| `LA_API_TOKEN` | unset | Require `Authorization: Bearer <token>` (or `x-api-key`); WebSockets also accept `?token=` |
+| `LA_ALLOW_PRIVATE_NETWORK` | on for loopback binds, off otherwise | Allow analyzing `localhost` / private addresses |
+| `LA_ALLOWED_TARGETS` | unset | `host` or `host:port` exempt from the private-network block (e.g. `staging.corp:8443`) |
+| `LA_ALLOWED_HOSTS` | unset | Extra `Host` header values to accept (reverse proxy, container name) |
+| `LA_ALLOWED_ORIGINS` | unset | Extra browser origins to accept |
+| `LA_MAX_CONCURRENT` | `4` | Concurrent analyses |
+
+Notes: the bundled web UIs do not send an API token, so with `LA_API_TOKEN` set use the API from scripts or CI. The native-browser mode attaches to Chrome on `localhost:9222` by design and is not covered by the network filter.
 
 ---
 

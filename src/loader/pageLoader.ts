@@ -4,10 +4,12 @@
 // Playwright, then runs the Shadow DOM traversal script.
 // ============================================================
 
-import { chromium, Browser, Page, Frame } from 'playwright';
+import { chromium, Browser, BrowserContext, Page, Frame } from 'playwright';
 import { AgentInput, LoadedPage, SerializedNode } from '../types';
 import { getBrowserTraversalScript, parseTraversalResult } from '../traverser/shadowDomTraverser';
 import { buildFrameSelector } from './frameSelector';
+import { AccessError } from '../security/guards';
+import { startFilteringProxy } from '../security/filteringProxy';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -111,21 +113,59 @@ export class PageLoader {
       throw new Error(`Storage state file not found: ${path.resolve(input.storageState)}`);
     }
 
-    const context = await this.browser!.newContext({
-      viewport: input.viewport || DEFAULT_VIEWPORT,
-      ignoreHTTPSErrors: true,
-      ...(input.storageState ? { storageState: path.resolve(input.storageState) } : {}),
-    });
+    // With a restrictive policy, all browser traffic goes through a filtering proxy
+    const policy = input.networkPolicy;
+    const proxy = policy && !policy.allowPrivateNetwork ? await startFilteringProxy(policy) : undefined;
+
+    let context: BrowserContext;
+    try {
+      context = await this.browser!.newContext({
+        viewport: input.viewport || DEFAULT_VIEWPORT,
+        ignoreHTTPSErrors: true,
+        ...(input.storageState ? { storageState: path.resolve(input.storageState) } : {}),
+        // `<-loopback>`: Chromium otherwise skips the proxy for localhost/127.x
+        ...(proxy ? { proxy: { server: proxy.url, bypass: '<-loopback>' } } : {}),
+      });
+    } catch (err) {
+      await proxy?.close();
+      throw err;
+    }
 
     try {
       const page = await context.newPage();
       const timeout = input.timeout || DEFAULT_TIMEOUT;
 
+      // Hosts the main frame tried to load (initial URL and every redirect hop)
+      const navigated = new Set<string>();
+      page.on('request', (r) => {
+        if (!r.isNavigationRequest() || r.frame() !== page.mainFrame()) return;
+        try {
+          const u = new URL(r.url());
+          navigated.add(`${u.hostname.replace(/^\[|\]$/g, '').toLowerCase()}:${u.port || (u.protocol === 'https:' ? 443 : 80)}`);
+        } catch {
+          // non-URL request, nothing to track
+        }
+      });
+      /** Reason the proxy refused one of the main frame's navigations, if it did */
+      const mainFrameBlock = (): string | undefined => {
+        for (const [target, reason] of proxy?.blocked() ?? []) if (navigated.has(target)) return reason;
+        return undefined;
+      };
+
       let source = '';
 
       if (input.url) {
         source = input.url;
-        await page.goto(input.url, { waitUntil: 'networkidle', timeout });
+        try {
+          await page.goto(input.url, { waitUntil: 'networkidle', timeout });
+        } catch (err) {
+          // Report the policy decision rather than a bare net::ERR_TUNNEL_CONNECTION_FAILED
+          const reason = mainFrameBlock();
+          throw reason ? new AccessError(reason) : err;
+        }
+        // An HTTP block is delivered as a 403 page, which loads "successfully"
+        const reason = mainFrameBlock();
+        if (reason) throw new AccessError(reason);
       } else if (input.filePath) {
         source = input.filePath;
         const resolved = path.resolve(input.filePath);
@@ -155,10 +195,14 @@ export class PageLoader {
         framesAnalyzed: traversal.frames.size,
         page,
         getContext: (framePath?: string[]) => traversal.frames.get(frameKey(framePath)) ?? page,
-        cleanup: async () => { await context.close(); },
+        cleanup: async () => {
+          await context.close();
+          await proxy?.close();
+        },
       };
     } catch (err) {
       await context.close();
+      await proxy?.close();
       throw err;
     }
   }

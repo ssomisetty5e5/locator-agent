@@ -270,6 +270,13 @@ export interface AgentInput {
 
   /** Path to a Playwright storageState JSON file (cookies/localStorage) to reuse a logged-in session */
   storageState?: string;
+
+  /**
+   * Network policy for everything the page loads (navigation, redirects, subresources).
+   * When `allowPrivateNetwork` is false, traffic goes through a filtering proxy that
+   * refuses loopback/private/link-local addresses. Set by the API server.
+   */
+  networkPolicy?: { allowPrivateNetwork: boolean; allowedTargets?: string[] };
 }
 
 /**
