@@ -19,7 +19,7 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 - **Interactive Inspect Mode** — Hover over elements, click to generate locators in real time
 - **3 Web UIs** — Simple URL analyzer, embedded headless browser, and native CDP browser mode
 - **CLI & REST API** — Terminal tool and HTTP endpoint for CI/CD integration
-- **113 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
+- **119 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
 
 ---
 
@@ -104,6 +104,28 @@ npm run cli -- analyze --url https://example.com --json
 # Analyze a logged-in page using a saved Playwright session
 npm run cli -- analyze --url https://app.example.com --storage-state ./auth.json
 ```
+
+### Use as an installed package / in CI
+
+The package exposes a `locator-agent` binary and a library entry point (`dist/index.js`). Build the tarball with `npm pack`, then install it in another project (`npm install ./locator-agent-1.0.0.tgz`) or run it with `npx`:
+
+```bash
+npx playwright install chromium     # one-time: npm does not download browsers
+
+# CI gate: exit code 2 if any element's best locator scores below 85,
+# matches several elements, or matches the wrong one
+npx locator-agent analyze --url https://staging.example.com/login --fail-below 85
+```
+
+```ts
+import { LocatorAgent } from 'locator-agent';
+
+const agent = new LocatorAgent();
+const analysis = await agent.analyze({ url: 'https://example.com' });
+await agent.shutdown();
+```
+
+Exit codes: `0` success, `1` error (bad input, unreachable page, missing browser), `2` quality gate failed. With `--json` the full analysis is still printed to stdout and the failing elements are listed on stderr.
 
 ### Generate a Page Object
 

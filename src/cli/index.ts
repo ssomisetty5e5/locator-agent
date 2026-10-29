@@ -5,20 +5,32 @@
 // ============================================================
 
 import * as fs from 'fs';
+import * as path from 'path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import { LocatorAgent } from '../agent';
 import { AgentInput, ElementAnalysis, PageAnalysis } from '../types';
 import { formatWithFrames } from '../util/frames';
+import { findWeakElements } from './ciGate';
 import type { PageObjectLanguage } from '../pageobject';
+
+/** Version from package.json, so `--version` can't drift from the published one */
+function packageVersion(): string {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf-8'));
+    return String(pkg.version);
+  } catch {
+    return '0.0.0';
+  }
+}
 
 const program = new Command();
 
 program
   .name('locator-agent')
   .description('Smart web locator generator with Shadow DOM support')
-  .version('1.0.0');
+  .version(packageVersion());
 
 program
   .command('analyze')
@@ -32,6 +44,7 @@ program
   .option('-s, --storage-state <path>', 'Playwright storageState JSON to reuse a logged-in session')
   .option('-j, --json', 'Output as JSON', false)
   .option('--top <n>', 'Show top N locators per element', '3')
+  .option('--fail-below <score>', 'CI gate: exit with code 2 if any element\'s best locator scores below this or is not unique')
   .action(async (opts) => {
     if (!opts.url && !opts.file && !opts.html) {
       console.error(chalk.red('Error: Provide --url, --file, or --html'));
@@ -57,10 +70,22 @@ program
 
       if (opts.json) {
         console.log(JSON.stringify(result, null, 2));
-        return;
+      } else {
+        printResults(result, parseInt(opts.top, 10));
       }
 
-      printResults(result, parseInt(opts.top, 10));
+      if (opts.failBelow !== undefined) {
+        const threshold = parseInt(opts.failBelow, 10);
+        const weak = findWeakElements(result, threshold);
+        if (weak.length > 0) {
+          console.error(chalk.red(`\n${weak.length} element(s) failed the locator quality gate (--fail-below ${threshold}):`));
+          for (const w of weak) {
+            console.error(`  #${w.index} <${w.tag}>${w.text ? ` "${w.text}"` : ''}  ${w.locator}  (${w.reason})`);
+          }
+          // exitCode, not exit(): the finally block must still close the browser
+          process.exitCode = 2;
+        }
+      }
     } catch (err: any) {
       console.error(chalk.red(`\n❌ Error: ${err.message}`));
       process.exit(1);

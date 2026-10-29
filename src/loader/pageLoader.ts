@@ -66,7 +66,15 @@ export class PageLoader {
    */
   async launch(): Promise<void> {
     if (!this.browser) {
-      this.browser = await chromium.launch({ headless: true });
+      try {
+        this.browser = await chromium.launch({ headless: true });
+      } catch (err: any) {
+        // A fresh `npm install` does not download browsers; say how to fix it
+        if (/Executable doesn't exist|playwright install/i.test(String(err?.message))) {
+          throw new Error('Chromium is not installed for Playwright. Run: npx playwright install chromium');
+        }
+        throw err;
+      }
     }
   }
 

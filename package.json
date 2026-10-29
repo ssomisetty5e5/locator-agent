@@ -2,16 +2,33 @@
   "name": "locator-agent",
   "version": "1.0.0",
   "description": "Smart web locator generator that pierces Shadow DOM for automation testing",
-  "main": "dist/cli/index.js",
+  "keywords": [
+    "locators",
+    "selectors",
+    "playwright",
+    "test-automation",
+    "page-object",
+    "shadow-dom"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
     "locator-agent": "dist/cli/index.js"
   },
+  "files": [
+    "dist",
+    "!dist/**/*.map",
+    "public",
+    "README.md"
+  ],
   "scripts": {
-    "build": "tsc",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc",
     "start:api": "ts-node src/api/server.ts",
     "cli": "ts-node src/cli/index.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepack": "npm run build"
   },
   "dependencies": {
     "chalk": "^4.1.2",
