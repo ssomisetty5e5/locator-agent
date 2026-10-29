@@ -8,7 +8,7 @@ import { ElementDiscoverer } from './discoverer';
 import { LocatorGenerator } from './generator';
 import { LocatorRanker } from './ranker';
 import { LocatorValidator } from './validator';
-import { generatePageObject, GeneratedPageObject, PageObjectOptions } from './pageobject';
+import { generatePageObject, GeneratedPageObject, PageObjectOptions, LANGUAGES } from './pageobject';
 import { ScopedLocatorGenerator } from './generator/scopedLocatorGenerator';
 import { getAncestorProbeScript, parseAncestors } from './discoverer/ancestorProbe';
 import type { Page, Frame } from 'playwright';
@@ -114,9 +114,13 @@ export class LocatorAgent {
   }
 
   /**
-   * Analyze a page and turn the result into a Playwright (TypeScript) page object.
+   * Analyze a page and turn the result into a Playwright page object (TypeScript, Python or Java).
    */
   async generatePageObject(input: AgentInput, options: PageObjectOptions = {}): Promise<GeneratedPageObject> {
+    // Fail before the (slow) page analysis when the request can't succeed
+    if (options.language && !LANGUAGES.includes(options.language)) {
+      throw new Error(`Unsupported language "${options.language}". Use one of: ${LANGUAGES.join(', ')}`);
+    }
     const analysis = await this.analyze(input);
     return generatePageObject(analysis, options);
   }

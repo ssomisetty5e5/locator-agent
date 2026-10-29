@@ -1,18 +1,29 @@
 // ============================================================
 // Page Object Generator
-// Turns a PageAnalysis into a ready-to-use Playwright (TypeScript)
-// page object: one named Locator property per element, using the best
+// Turns a PageAnalysis into a ready-to-use Playwright page object
+// (TypeScript, Python or Java): one named Locator property per element, using the best
 // validated locator, with iframe chains included.
 // ============================================================
 
 import { ElementAnalysis, LocatorResult, PageAnalysis } from '../types';
 import { playwrightFramePrefix } from '../util/frames';
 import { nameElements, toPascal, toWords } from './elementNamer';
+import {
+  LANGUAGES,
+  PageObjectLanguage,
+  propertyName,
+  renderPageObject,
+  translateExpression,
+} from './renderers';
 
 export interface PageObjectOptions {
+  /** Output language (default 'typescript') */
+  language?: PageObjectLanguage;
+  /** Java only: package declaration for the generated class */
+  javaPackage?: string;
   /** Class name; derived from the page title/URL when omitted */
   className?: string;
-  /** Module to import `Page` and `Locator` types from (default '@playwright/test') */
+  /** TypeScript only: module to import `Page` and `Locator` types from (default '@playwright/test') */
   importFrom?: string;
   /** Skip elements whose best locator scores below this (default 0) */
   minScore?: number;
@@ -21,9 +32,12 @@ export interface PageObjectOptions {
 }
 
 export interface GeneratedElement {
+  /** Property name in the target language (snake_case for Python) */
   name: string;
-  /** Playwright expression, rooted at `page` */
+  /** Playwright TypeScript expression, rooted at `page` (language-neutral form) */
   expression: string;
+  /** The same locator written in the target language */
+  code: string;
   score: number;
   /** True when the locator matched exactly the target element during analysis */
   verified: boolean;
@@ -32,11 +46,15 @@ export interface GeneratedElement {
 
 export interface GeneratedPageObject {
   className: string;
+  language: PageObjectLanguage;
   code: string;
   elements: GeneratedElement[];
   /** Elements left out (no Playwright-expressible locator, or below minScore) */
   skipped: number;
 }
+
+/** How many score points a descriptive locator may trail a bare role locator and still win. */
+const BARE_ROLE_MARGIN = 25;
 
 /** `'it''s'`-safe single-quoted TS string literal. */
 function quote(s: string): string {
@@ -72,8 +90,19 @@ function pickLocator(analysis: ElementAnalysis): { expression: string; loc: Loca
     .map((loc) => ({ loc, expression: toPlaywrightExpression(loc) }))
     .filter((c): c is { loc: LocatorResult; expression: string } => c.expression !== null);
 
-  const verified = candidates.find((c) => c.loc.matchCount === 1 && c.loc.resolvesToTarget !== false);
-  if (verified) return { ...verified, verified: true };
+  const verifiedList = candidates.filter((c) => c.loc.matchCount === 1 && c.loc.resolvesToTarget !== false);
+  if (verifiedList.length > 0) {
+    // A name-less role locator ("the only textbox") is unique today but silently
+    // stops being unique when another such control is added. Prefer a descriptive
+    // verified locator (placeholder, label, test id…) when one scores comparably.
+    const isBareRole = (c: { loc: LocatorResult }) => /^getByRole\('[^']+'\)$/.test(c.loc.value);
+    let best = verifiedList[0];
+    if (isBareRole(best)) {
+      const alternative = verifiedList.find((c) => !isBareRole(c) && c.loc.score >= best.loc.score - BARE_ROLE_MARGIN);
+      if (alternative) best = alternative;
+    }
+    return { ...best, verified: true };
+  }
   if (candidates.length > 0) return { ...candidates[0], verified: false };
   return null;
 }
@@ -106,12 +135,17 @@ function sanitizeClassName(name: string): string {
 }
 
 export function generatePageObject(analysis: PageAnalysis, options: PageObjectOptions = {}): GeneratedPageObject {
+  const language: PageObjectLanguage = options.language ?? 'typescript';
+  if (!LANGUAGES.includes(language)) {
+    throw new Error(`Unsupported language "${language}". Use one of: ${LANGUAGES.join(', ')}`);
+  }
+
   const className = sanitizeClassName(options.className ?? deriveClassName(analysis));
   const importFrom = options.importFrom ?? '@playwright/test';
   const minScore = options.minScore ?? 0;
 
   // Pick locators first: names for duplicates depend on the chosen locator's scope.
-  const picked: { analysis: ElementAnalysis; expression: string; verified: boolean }[] = [];
+  const picked: { analysis: ElementAnalysis; expression: string; code: string; verified: boolean }[] = [];
   const seenExpressions = new Set<string>();
   let skipped = 0;
 
@@ -119,47 +153,49 @@ export function generatePageObject(analysis: PageAnalysis, options: PageObjectOp
     const choice = pickLocator(a);
     if (!choice || choice.loc.score < minScore) { skipped++; continue; }
     if (seenExpressions.has(choice.expression)) { skipped++; continue; } // same locator, same element
+
+    // Must be expressible in the target language (Python/Java cover a subset of what TS can chain)
+    const translated = translateExpression(choice.expression, language);
+    if (!translated) { skipped++; continue; }
+
     seenExpressions.add(choice.expression);
-    picked.push({ analysis: { ...a, recommended: choice.loc }, expression: choice.expression, verified: choice.verified });
+    picked.push({
+      analysis: { ...a, recommended: choice.loc },
+      expression: choice.expression,
+      code: translated.code,
+      verified: choice.verified,
+    });
   }
 
-  const names = nameElements(picked.map((p) => p.analysis));
+  // Names follow the target language's conventions (snake_case in Python) and stay unique
+  const baseNames = nameElements(picked.map((p) => p.analysis));
+  const used = new Set<string>();
+  const names = baseNames.map((n) => {
+    const converted = propertyName(n, language);
+    let unique = converted;
+    for (let i = 2; used.has(unique); i++) unique = `${converted}${language === 'python' ? '_' : ''}${i}`;
+    used.add(unique);
+    return unique;
+  });
+
   const elements: GeneratedElement[] = picked.map((p, i) => ({
     name: names[i],
     expression: p.expression,
+    code: p.code,
     score: p.analysis.recommended.score,
     verified: p.verified,
     framePath: p.analysis.recommended.framePath,
   }));
 
-  const isUrl = /^https?:\/\//.test(analysis.source);
-  const lines: string[] = [];
-  lines.push(`import type { Page, Locator } from ${quote(importFrom)};`);
-  lines.push('');
-  lines.push('/**');
-  lines.push(` * Page object for ${analysis.pageTitle ? `"${analysis.pageTitle.replace(/\*\//g, '* /')}"` : 'the analyzed page'}.`);
-  if (isUrl) lines.push(` * Source: ${analysis.source}`);
-  lines.push(' * Generated by LocatorAgent; locators were validated against the live page.');
-  lines.push(' */');
-  lines.push(`export class ${className} {`);
-  lines.push('  readonly page: Page;');
-  for (const e of elements) lines.push(`  readonly ${e.name}: Locator;`);
-  lines.push('');
-  lines.push('  constructor(page: Page) {');
-  lines.push('    this.page = page;');
-  picked.forEach((p, i) => {
-    const note = p.verified ? '' : ' // TODO: not verified unique, check before relying on it';
-    lines.push(`    this.${elements[i].name} = ${p.expression};${note}`);
+  const code = renderPageObject(language, {
+    className,
+    title: analysis.pageTitle || '',
+    source: analysis.source,
+    goto: /^https?:\/\//.test(analysis.source) && !options.noGoto,
+    importFrom,
+    javaPackage: options.javaPackage,
+    elements: elements.map((e) => ({ name: e.name, expression: e.expression, verified: e.verified })),
   });
-  lines.push('  }');
-  if (isUrl && !options.noGoto) {
-    lines.push('');
-    lines.push('  async goto(): Promise<void> {');
-    lines.push(`    await this.page.goto(${quote(analysis.source)});`);
-    lines.push('  }');
-  }
-  lines.push('}');
-  lines.push('');
 
-  return { className, code: lines.join('\n'), elements, skipped };
+  return { className, language, code, elements, skipped };
 }

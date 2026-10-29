@@ -65,11 +65,11 @@ app.post('/analyze', async (req: Request, res: Response) => {
 
 /**
  * POST /generate/page-object
- * Accepts the same inputs as /analyze plus { className, minScore, importFrom, noGoto }
- * and returns { className, code, elements, skipped }.
+ * Accepts the same inputs as /analyze plus { className, language, javaPackage, minScore, importFrom, noGoto }
+ * (language: 'typescript' | 'python' | 'java') and returns { className, language, code, elements, skipped }.
  */
 app.post('/generate/page-object', async (req: Request, res: Response) => {
-  const { url, html, filePath, timeout, maxElements, storageState, className, minScore, importFrom, noGoto } = req.body;
+  const { url, html, filePath, timeout, maxElements, storageState, className, minScore, importFrom, noGoto, language, javaPackage } = req.body;
 
   if (!url && !html && !filePath) {
     res.status(400).json({ error: 'Provide at least one of: url, html, filePath' });
@@ -80,11 +80,12 @@ app.post('/generate/page-object', async (req: Request, res: Response) => {
   try {
     const result = await agent.generatePageObject(
       { url, html, filePath, maxElements: maxElements ?? 100, timeout: timeout ?? 30000, storageState },
-      { className, minScore, importFrom, noGoto },
+      { className, minScore, importFrom, noGoto, language, javaPackage },
     );
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Internal server error' });
+    // An unsupported language is the caller's mistake, not a server failure
+    res.status(/Unsupported language/.test(err.message) ? 400 : 500).json({ error: err.message || 'Internal server error' });
   } finally {
     await agent.shutdown();
   }

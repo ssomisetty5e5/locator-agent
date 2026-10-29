@@ -113,6 +113,19 @@ describe('generatePageObject', () => {
     expect(bad.elements[0].verified).toBe(false);
   });
 
+  it('prefers a descriptive verified locator over a bare role locator, unless it trails by too much', () => {
+    const bare = loc({ value: "getByRole('textbox')", score: 92 });
+    const placeholder = loc({ strategy: 'placeholder', value: "getByPlaceholder('Email')", score: 80 });
+    const weak = loc({ strategy: 'xpath', framework: 'xpath', value: '//input[1]', score: 40 });
+
+    const input = el({ tag: 'input', attributes: { placeholder: 'Email' } });
+    const picks = (locators: LocatorResult[]) =>
+      generatePageObject(analysisOf([{ element: input, locators, recommended: locators[0] }])).elements[0].expression;
+
+    expect(picks([bare, placeholder])).toBe("page.getByPlaceholder('Email')");
+    expect(picks([bare, weak])).toBe("page.getByRole('textbox')");
+  });
+
   it('adds goto() only for URL sources and honours options', () => {
     const e = analysis(el({ text: 'Go' }), [loc({})]);
     const url = generatePageObject(analysisOf([e], { source: 'https://example.com/x?a=1' }), { className: 'My Page!' });

@@ -11,6 +11,7 @@ import Table from 'cli-table3';
 import { LocatorAgent } from '../agent';
 import { AgentInput, ElementAnalysis, PageAnalysis } from '../types';
 import { formatWithFrames } from '../util/frames';
+import type { PageObjectLanguage } from '../pageobject';
 
 const program = new Command();
 
@@ -70,7 +71,7 @@ program
 
 program
   .command('page-object')
-  .description('Generate a Playwright (TypeScript) page object for a page')
+  .description('Generate a Playwright page object (TypeScript, Python or Java) for a page')
   .option('-u, --url <url>', 'URL of the page')
   .option('-f, --file <path>', 'Path to an HTML snapshot file')
   .option('--html <html>', 'Raw HTML string')
@@ -80,7 +81,9 @@ program
   .option('-t, --timeout <ms>', 'Page load timeout in ms', '30000')
   .option('-s, --storage-state <path>', 'Playwright storageState JSON to reuse a logged-in session')
   .option('--min-score <n>', 'Skip elements whose best locator scores below this', '0')
-  .option('--import-from <module>', 'Module to import Page/Locator types from', '@playwright/test')
+  .option('-l, --language <lang>', 'Output language: typescript, python or java', 'typescript')
+  .option('--package <name>', 'Java only: package declaration for the generated class')
+  .option('--import-from <module>', 'TypeScript only: module to import Page/Locator types from', '@playwright/test')
   .option('--no-goto', 'Do not generate a goto() method')
   .option('-j, --json', 'Output the full result (class, code, elements) as JSON', false)
   .action(async (opts) => {
@@ -104,6 +107,8 @@ program
         },
         {
           className: opts.className,
+          language: String(opts.language).toLowerCase() as PageObjectLanguage,
+          javaPackage: opts.package,
           importFrom: opts.importFrom,
           minScore: parseInt(opts.minScore, 10),
           noGoto: opts.goto === false,
