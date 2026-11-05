@@ -533,6 +533,11 @@
       <div class="input-group">
         <label for="url-input">Page URL</label>
         <input type="text" id="url-input" placeholder="https://example.com" spellcheck="false">
+        <div style="margin-top:6px;font-size:12px;opacity:.75">
+          No page handy?
+          <a href="#" id="use-sample" onclick="document.getElementById('url-input').value = location.origin + '/demo.html'; return false;">Use the built-in sample page</a>
+          (login form, repeated rows, Shadow DOM, iframe)
+        </div>
       </div>
     </div>
 

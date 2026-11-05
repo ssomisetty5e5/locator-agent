@@ -1,0 +1,16 @@
+node_modules
+dist
+.git
+.gitignore
+tests
+docs
+*.log
+*.pptx
+generate-pptx.js
+DEMO_SCRIPT.md
+HACKATHON_SUBMISSION.md
+PRESENTATION.md
+idp-samples
+test-results
+playwright-report
+coverage

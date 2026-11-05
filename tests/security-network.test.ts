@@ -89,6 +89,15 @@ describe('filtering proxy', () => {
     await expect(resolveAllowedAddress('staging.corp', 443, policy, async () => ['10.9.9.9'])).resolves.toBe('10.9.9.9');
     await expect(resolveAllowedAddress('other.corp', 443, policy, async () => ['10.9.9.9'])).rejects.toThrow(AccessError);
   });
+
+  it('prefers an IPv4 address when a host resolves to both families', async () => {
+    const policy = { allowPrivateNetwork: false, allowedTargets: ['localhost:3000'] };
+    await expect(resolveAllowedAddress('localhost', 3000, policy, async () => ['::1', '127.0.0.1'])).resolves.toBe('127.0.0.1');
+    // still refuses when any address is private and the target is not exempt
+    await expect(
+      resolveAllowedAddress('mixed.example', 443, { allowPrivateNetwork: false }, async () => ['93.184.216.34', '10.0.0.1']),
+    ).rejects.toThrow(AccessError);
+  });
 });
 
 describe('network policy in the page loader', () => {

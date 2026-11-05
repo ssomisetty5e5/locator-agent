@@ -157,7 +157,9 @@ export async function resolveAllowedAddress(
   }
   if (addresses.length === 0) throw new AccessError(`Cannot resolve host ${host}`);
   if (!permitted && addresses.some(isPrivateAddress)) throw deny();
-  return addresses[0];
+  // Every address passed the check above; prefer IPv4 since "localhost" often lists ::1 first
+  // while servers (e.g. in a container) listen on IPv4 only
+  return addresses.find((a) => net.isIPv4(a)) ?? addresses[0];
 }
 
 /**

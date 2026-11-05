@@ -19,25 +19,42 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 - **Interactive Inspect Mode** — Hover over elements, click to generate locators in real time
 - **3 Web UIs** — Simple URL analyzer, embedded headless browser, and native CDP browser mode
 - **CLI & REST API** — Terminal tool and HTTP endpoint for CI/CD integration
-- **198 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
+- **199 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (under 5 minutes)
+
+Pick one. Both end at **http://localhost:3000**.
+
+**Option A — Node** (needs Node ≥ 18)
 
 ```bash
-# Install dependencies
 npm install
-npx playwright install chromium
-
-# Build
-npm run build
-
-# Start the server
+npx playwright install chromium   # one-time browser download
 npm run start:api
 ```
 
-Then open **http://localhost:3000** in your browser.
+**Option B — Docker** (nothing else to install; Chromium is inside the image)
+
+```bash
+docker build -t locator-agent .
+docker run --rm -p 127.0.0.1:3000:3000 locator-agent
+```
+
+### Try it in 30 seconds
+
+1. Open http://localhost:3000.
+2. Click **Use the built-in sample page** (under the URL box), then **Analyze Page**.
+3. Expand any element — for example **Settings**, which sits inside two nested Shadow DOM roots — to see its ranked, validated locators.
+
+The sample page (`/demo.html`) has a login form, repeated table rows, Shadow DOM components and an iframe, so it exercises every feature without needing a site of your own.
+
+| Analyzer results | One element's ranked locators |
+|---|---|
+| ![Analyzer](docs/images/analyzer.png) | ![Locators](docs/images/locators.png) |
+
+> **Analyzing your own app from Docker?** The container blocks private addresses except its own sample page. To allow your dev server, add e.g. `-e LA_ALLOWED_TARGETS=localhost:3000,host.docker.internal:4200` and open `http://host.docker.internal:4200`. See [Running the server safely](#running-the-server-safely).
 
 ---
 

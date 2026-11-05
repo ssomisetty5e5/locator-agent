@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LocatorAgent Sample Page</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #1f2937; }
+    h1 { font-size: 1.4rem; }
+    section { border: 1px solid #d1d5db; border-radius: 8px; padding: 1rem 1.25rem; margin: 1rem 0; }
+    h2 { font-size: 1rem; margin: 0 0 .75rem; }
+    label { display: block; margin: .4rem 0; }
+    input[type=text], input[type=email], input[type=password] { padding: .35rem .5rem; margin-left: .5rem; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid #e5e7eb; }
+    button { padding: .3rem .8rem; cursor: pointer; }
+    iframe { width: 100%; height: 110px; border: 1px dashed #9ca3af; }
+    .hint { color: #6b7280; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <h1>LocatorAgent sample page</h1>
+  <p class="hint">A small page with the cases that make locators hard: a login form, repeated rows,
+    Shadow DOM components (one nested) and an iframe.</p>
+
+  <section>
+    <h2>1. Plain form</h2>
+    <form onsubmit="return false">
+      <label>Email <input type="email" id="email" name="email" placeholder="you@example.com"></label>
+      <label>Password <input type="password" name="password" placeholder="Password"></label>
+      <label><input type="checkbox" name="remember"> Remember me</label>
+      <button type="submit" data-testid="signin">Sign in</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>2. Repeated rows (same button in every row)</h2>
+    <table>
+      <tr><th>Invoice</th><th>Customer</th><th></th></tr>
+      <tr><td>INV-1041</td><td>Acme Ltd</td><td><button>Edit</button> <button>Delete</button></td></tr>
+      <tr><td>INV-1042</td><td>Globex</td><td><button>Edit</button> <button>Delete</button></td></tr>
+      <tr><td>INV-1043</td><td>Initech</td><td><button>Edit</button> <button>Delete</button></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. Shadow DOM components</h2>
+    <acme-search></acme-search>
+    <acme-toolbar></acme-toolbar>
+  </section>
+
+  <section>
+    <h2>4. Inside an iframe</h2>
+    <iframe title="Newsletter" srcdoc="<form onsubmit='return false' style='font-family:system-ui'>
+      <label>Newsletter email <input type='email' name='newsletter' placeholder='name@company.com'></label>
+      <button type='submit' id='subscribe'>Subscribe</button></form>"></iframe>
+  </section>
+
+  <script>
+    // Open shadow root: a search box
+    customElements.define('acme-search', class extends HTMLElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' }).innerHTML =
+          '<input type="text" placeholder="Search products" aria-label="Search products">' +
+          '<button type="button">Search</button>';
+      }
+    });
+
+    // Nested shadow roots: toolbar > icon button > real <button>
+    customElements.define('acme-icon-button', class extends HTMLElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' }).innerHTML =
+          '<button type="button" aria-label="' + (this.getAttribute('label') || 'Action') + '"></button>';
+      }
+      connectedCallback() {
+        const b = this.shadowRoot.querySelector('button');
+        b.setAttribute('aria-label', this.getAttribute('label') || 'Action');
+        b.textContent = this.getAttribute('label') || 'Action';
+      }
+    });
+    customElements.define('acme-toolbar', class extends HTMLElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' }).innerHTML =
+          '<acme-icon-button label="Settings"></acme-icon-button>' +
+          '<acme-icon-button label="Help"></acme-icon-button>';
+      }
+    });
+  </script>
+</body>
+</html>
