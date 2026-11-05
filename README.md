@@ -324,4 +324,4 @@ npm run test:watch
 
 ## License
 
-MIT
+Proprietary — all rights reserved (`UNLICENSED`). Contact the maintainers before redistributing.

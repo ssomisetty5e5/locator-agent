@@ -10,6 +10,15 @@
     "page-object",
     "shadow-dom"
   ],
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ssomisetty5e5/locator-agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ssomisetty5e5/locator-agent/issues"
+  },
+  "homepage": "https://github.com/ssomisetty5e5/locator-agent#readme",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -28,7 +37,8 @@
     "cli": "ts-node src/cli/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "prepublishOnly": "npm test"
   },
   "dependencies": {
     "chalk": "^4.1.2",
