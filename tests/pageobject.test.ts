@@ -49,6 +49,14 @@ describe('element naming', () => {
     expect(baseName(el({ text: 'Delete' }))).toBe('deleteButton');
   });
 
+  it('ignores placeholders that are sample data rather than labels', () => {
+    const input = (attributes: Record<string, string>) => baseName(el({ tag: 'input', attributes }));
+    expect(input({ type: 'email', id: 'email', name: 'email', placeholder: 'you@example.com' })).toBe('emailInput');
+    expect(input({ name: 'site', placeholder: 'https://example.com' })).toBe('siteInput');
+    // a real label-style placeholder still wins
+    expect(input({ name: 'q', placeholder: 'Search products' })).toBe('searchProductsInput');
+  });
+
   it('classifies kinds', () => {
     expect(elementKind(el({ tag: 'input', attributes: { type: 'submit' } }))).toBe('Button');
     expect(elementKind(el({ tag: 'div', ariaRole: 'tab' }))).toBe('Tab');

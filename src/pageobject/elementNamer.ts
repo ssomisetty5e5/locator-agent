@@ -52,10 +52,13 @@ function labelFor(el: DiscoveredElement): string {
     ? (a['href'].split(/[?#]/)[0].split('/').filter(Boolean).pop() || '')
     : '';
 
+  // "you@example.com" is sample data, not a label: skip it so the name/id wins
+  const placeholder = a['placeholder'] && !/[@:/]|\bexample\b/i.test(a['placeholder']) ? a['placeholder'] : '';
+
   const candidates = [
     a['aria-label'],
     el.text && el.text.length <= 40 ? el.text : '',
-    a['placeholder'],
+    placeholder,
     a['data-testid'],
     a['name'],
     id,
