@@ -5,40 +5,24 @@
 
 import { PageLoader } from './loader';
 import { ElementDiscoverer } from './discoverer';
-import { LocatorGenerator } from './generator';
-import { LocatorRanker } from './ranker';
 import { LocatorValidator } from './validator';
 import { generatePageObject, GeneratedPageObject, PageObjectOptions, LANGUAGES } from './pageobject';
-import { ScopedLocatorGenerator } from './generator/scopedLocatorGenerator';
+import { ElementAnalyzer, ElementDriver } from './core/elementAnalyzer';
 import { getAncestorProbeScript, parseAncestors } from './discoverer/ancestorProbe';
 import type { Page, Frame } from 'playwright';
-import {
-  AgentInput,
-  PageAnalysis,
-  ElementAnalysis,
-  DiscoveredElement,
-  LocatorResult,
-  AncestorInfo,
-} from './types';
-
-/** Keep at most this many validated scoped locators per element */
-const MAX_SCOPED_RESULTS = 3;
+import { AgentInput, PageAnalysis, ElementAnalysis } from './types';
 
 export class LocatorAgent {
   private loader: PageLoader;
   private discoverer: ElementDiscoverer;
-  private generator: LocatorGenerator;
-  private ranker: LocatorRanker;
   private validator: LocatorValidator;
-  private scopedGenerator: ScopedLocatorGenerator;
+  private analyzer: ElementAnalyzer;
 
   constructor() {
     this.loader = new PageLoader();
     this.discoverer = new ElementDiscoverer();
-    this.generator = new LocatorGenerator();
-    this.ranker = new LocatorRanker();
     this.validator = new LocatorValidator();
-    this.scopedGenerator = new ScopedLocatorGenerator();
+    this.analyzer = new ElementAnalyzer();
   }
 
   /**
@@ -46,8 +30,6 @@ export class LocatorAgent {
    * Validates each locator against the live page for uniqueness.
    */
   async analyze(input: AgentInput): Promise<PageAnalysis> {
-    const startTime = Date.now();
-
     const loaded = await this.loader.loadWithPage(input);
 
     try {
@@ -61,41 +43,9 @@ export class LocatorAgent {
       // Step 2: Generate, validate, and rank locators for each element
       const elementAnalyses: ElementAnalysis[] = [];
       for (const el of elements) {
-        const rawLocators = this.generator.generate(el);
-
         // Elements inside iframes are validated within their own frame
-        if (el.framePath) {
-          for (const loc of rawLocators) loc.framePath = el.framePath;
-        }
-
-        // Validate uniqueness against the live page
         const context = loaded.getContext(el.framePath);
-        await this.validator.validate(context, rawLocators, undefined, el.nodeIndex);
-
-        // Rank (scores now include uniqueness bonuses/penalties)
-        let ranked = this.ranker.rank(rawLocators, el);
-
-        // Second pass: if nothing found the element uniquely on its own,
-        // try locators scoped to a distinguishing ancestor (row, card, list item…)
-        if (this.needsScope(ranked) && el.nodeIndex !== undefined) {
-          const scoped = await this.buildScopedLocators(context, el, rawLocators);
-          if (scoped.length > 0) {
-            rawLocators.push(...scoped);
-            ranked = this.ranker.rank(rawLocators, el);
-          }
-        }
-
-        const recommended = ranked.length > 0
-          ? this.ranker.getBest(ranked)
-          : {
-              strategy: 'css' as const,
-              value: el.tag,
-              framework: 'css' as const,
-              score: 0,
-              scoreReason: 'No locators could be generated',
-            };
-
-        elementAnalyses.push({ element: el, locators: ranked, recommended });
+        elementAnalyses.push(await this.analyzer.analyze(el, this.driverFor(context)));
       }
 
       return {
@@ -125,43 +75,12 @@ export class LocatorAgent {
     return generatePageObject(analysis, options);
   }
 
-  /**
-   * True when no locator finds the element both uniquely and without relying
-   * on its position (nth-of-type / nth-child / [n] indexes), which break as
-   * soon as rows or items are added, removed or reordered.
-   */
-  private needsScope(ranked: LocatorResult[]): boolean {
-    return !ranked.some(
-      (l) =>
-        l.matchCount === 1 &&
-        l.resolvesToTarget !== false &&
-        !/nth-(of-type|child)|\[\d+\]/.test(l.value),
-    );
-  }
-
-  /**
-   * Generate and validate ancestor-scoped locators for an element; only
-   * candidates that match exactly one element, the target, are kept.
-   */
-  private async buildScopedLocators(
-    context: Page | Frame,
-    el: DiscoveredElement,
-    baseLocators: LocatorResult[],
-  ): Promise<LocatorResult[]> {
-    let ancestors: AncestorInfo[] = [];
-    try {
-      ancestors = parseAncestors(await context.evaluate(getAncestorProbeScript(el.nodeIndex!)));
-    } catch {
-      return [];
-    }
-
-    const candidates = this.scopedGenerator.generate(el, baseLocators, ancestors);
-    if (candidates.length === 0) return [];
-
-    await this.validator.validate(context, candidates, undefined, el.nodeIndex);
-    return candidates
-      .filter((c) => c.matchCount === 1 && c.resolvesToTarget === true)
-      .slice(0, MAX_SCOPED_RESULTS);
+  /** Validate and probe through a Playwright page or frame. */
+  private driverFor(context: Page | Frame): ElementDriver {
+    return {
+      validate: (locators, nodeIndex) => this.validator.validate(context, locators, undefined, nodeIndex),
+      probeAncestors: async (nodeIndex) => parseAncestors(await context.evaluate(getAncestorProbeScript(nodeIndex))),
+    };
   }
 
   /**

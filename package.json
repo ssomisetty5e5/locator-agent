@@ -37,6 +37,9 @@
     "cli": "ts-node src/cli/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "build:extension": "node scripts/build-extension.js",
+    "typecheck:extension": "tsc -p extension/tsconfig.json",
+    "package:extension": "node scripts/package-extension.js",
     "prepack": "npm run build",
     "prepublishOnly": "npm test"
   },
@@ -53,6 +56,7 @@
     "@types/express": "^5.0.0",
     "@types/node": "^22.15.0",
     "@types/ws": "^8.18.1",
+    "esbuild": "^0.27.7",
     "pptxgenjs": "^4.0.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",

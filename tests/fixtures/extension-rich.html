@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><title>Rich fixture</title></head>
+<body>
+  <header><nav aria-label="Main">
+    <a href="/home">Home</a> <a href="/products">Products</a> <a href="#">  Spaced   Out  </a>
+  </nav></header>
+  <main>
+    <h1>Account settings</h1>
+    <form id="profile" aria-label="Profile">
+      <label for="fn">First name</label><input id="fn" name="first">
+      <label>Last name <input name="last" placeholder="Surname"></label>
+      <span id="lbl-mail">Contact email</span><input type="email" aria-labelledby="lbl-mail" data-testid="mail">
+      <input type="search" placeholder="Search help">
+      <select name="country" aria-label="Country"><option>Canada</option><option>India</option></select>
+      <label><input type="checkbox" name="news"> Send me news</label>
+      <label><input type="radio" name="plan" value="a"> Free</label>
+      <label><input type="radio" name="plan" value="b"> Pro</label>
+      <textarea name="bio" placeholder="About you"></textarea>
+      <input type="submit" value="Save profile">
+      <input type="image" alt="Go" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+      <button type="button"><img alt="Settings icon" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="> Preferences</button>
+      <button type="button" style="display:none">Invisible</button>
+      <button type="button" aria-hidden="true">Aria hidden</button>
+      <button type="button">It's fine</button>
+      <button type="button" title="Tooltip only"></button>
+    </form>
+    <section aria-label="Cards">
+      <div class="card" id="card-1"><h2>Alpha plan</h2><button>Buy</button><a href="/a">Details</a></div>
+      <div class="card" id="card-2"><h2>Beta plan</h2><button>Buy</button><a href="/b">Details</a></div>
+    </section>
+    <table>
+      <caption>Orders</caption>
+      <tr><th>Order</th><th>Status</th><th></th></tr>
+      <tr><td>A-1</td><td>Shipped</td><td><button>Cancel</button></td></tr>
+      <tr><td>A-2</td><td>Shipped</td><td><button>Cancel</button></td></tr>
+      <tr><td>A-3</td><td>Pending</td><td><button>Cancel</button></td></tr>
+    </table>
+    <ul><li><a href="/x">Item one</a></li><li><a href="/y">Item two</a></li></ul>
+    <details><summary>More options</summary><button data-testid="deep">Deep action</button></details>
+    <div role="button" tabindex="0">Custom role button</div>
+    <div role="tab" tabindex="0" aria-label="Overview tab">Overview</div>
+    <div contenteditable="true">Editable note</div>
+    <my-card><template shadowrootmode="open"><div><h3>Shadow card</h3><button>Open card</button><a href="/s">Card link</a></div></template></my-card>
+    <x-outer><template shadowrootmode="open"><x-inner><template shadowrootmode="open"><input placeholder="Nested field"><button aria-label="Nested go">Go</button></template></x-inner></template></x-outer>
+  </main>
+</body>
+</html>

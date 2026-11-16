@@ -18,8 +18,9 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 - **Shortened Chain Variants** — Shadow-piercing locators get shortened versions when possible (⚡ badge)
 - **Interactive Inspect Mode** — Hover over elements, click to generate locators in real time
 - **3 Web UIs** — Simple URL analyzer, embedded headless browser, and native CDP browser mode
+- **Browser Extension** — Pick any element or analyze the whole page right in Chrome/Edge, with no server, and export page objects ([details](#-browser-extension-chrome--edge))
 - **CLI & REST API** — Terminal tool and HTTP endpoint for CI/CD integration
-- **199 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
+- **212 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
 
 ---
 
@@ -100,6 +101,41 @@ Connects to **your own Chrome/Edge** via the Chrome DevTools Protocol (CDP). The
 5. The app loads right inside the LocatorAgent page. Click **🎯 Inspect** to pick elements, or **🔍 Analyze** to scan all.
 
 > **Why native mode?** Use it when you need to test against login-protected apps using your real browser session with cookies, extensions, and saved credentials.
+
+---
+
+## 🧩 Browser Extension (Chrome / Edge)
+
+Get ranked, validated locators for any element of the page you are looking at — no server, no Playwright, nothing to run alongside.
+
+**Install from source**
+
+```bash
+npm install
+npm run build:extension
+```
+
+Then open `chrome://extensions` (or `edge://extensions`), switch on **Developer mode**, click **Load unpacked** and choose the `extension` folder.
+
+**Use it**
+
+1. Open any page and click the LocatorAgent toolbar button (or press **Alt+L**).
+2. **🎯 Pick element** — hover to highlight, click to choose (the page does not receive the click; **Esc** cancels). You get the recommended locator, then every locator with its score and a match badge (`✓ 1` unique, `⚠ 3` matches three elements, `✗ 0` matches nothing). Filter by framework and copy any of them.
+3. **🔍 Analyze page** — every interactive element on the page with its best locator, plus a **Page object** button that generates a Playwright class in TypeScript, Python or Java to copy or download.
+
+**Share it**
+
+```bash
+npm run package:extension     # -> extension/locator-agent-extension-1.0.0.zip
+```
+
+The zip has `manifest.json` at its top level. Colleagues can unzip it and use **Load unpacked**; it can also be uploaded to the Chrome Web Store or Edge Add-ons, or deployed to a company's browsers through enterprise policy.
+
+**Privacy and permissions.** Everything runs inside the page; the extension makes no network requests. It asks only for `activeTab` and `scripting`, so nothing runs on a page until you click the button, and it has no standing access to any site.
+
+**How it works.** It uses the same discovery, generation, ranking and page-object code as the CLI. Only the validator is different: Playwright isn't available in a web page, so the extension re-implements how Playwright resolves `getByRole`, `getByText`, `getByLabel`, scoped locators and shadow-piercing chains. A test runs the extension's engine and the Playwright pipeline on the same pages and requires identical match counts and recommendations.
+
+**Limits.** Chrome and Edge (Manifest V3); Firefox isn't supported. Closed shadow roots and cross-origin iframes can't be reached. *Analyze page* covers the main document; *Pick element* also works inside same-origin iframes. The role and accessible-name matching is a close, tested approximation of Playwright's, not a copy of it.
 
 ---
 

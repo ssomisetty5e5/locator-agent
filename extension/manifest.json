@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "LocatorAgent",
+  "version": "1.0.0",
+  "description": "Ranked, validated locators for any element on any page, including Shadow DOM and iframes. Pick an element or analyze the whole page, then copy Playwright, Selenium, CSS or XPath locators or a ready-made page object.",
+  "minimum_chrome_version": "110",
+  "action": {
+    "default_title": "LocatorAgent (Alt+L)",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "permissions": ["activeTab", "scripting"],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+L"
+      },
+      "description": "Show or hide the LocatorAgent panel"
+    }
+  }
+}

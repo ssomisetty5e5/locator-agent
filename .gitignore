@@ -26,6 +26,10 @@ npm-debug.log*
 # Temp Chrome profile
 C:\temp\chrome-debug/
 
+# Browser extension build output (npm run build:extension / package:extension)
+extension/dist/
+extension/*.zip
+
 # Test coverage
 coverage/
 
