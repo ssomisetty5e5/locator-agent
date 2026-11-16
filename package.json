@@ -40,6 +40,7 @@
     "build:extension": "node scripts/build-extension.js",
     "typecheck:extension": "tsc -p extension/tsconfig.json",
     "package:extension": "node scripts/package-extension.js",
+    "build:manual": "node scripts/build-manual.js",
     "prepack": "npm run build",
     "prepublishOnly": "npm test"
   },

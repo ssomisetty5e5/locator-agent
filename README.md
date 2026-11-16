@@ -2,6 +2,8 @@
 
 An intelligent agent that analyzes web pages — including deep Shadow DOM trees — and generates robust, ranked locators for automation testing. Comes with three interactive web UIs: a simple analyzer, an embedded headless browser, and a **native browser mode** that connects to your own Chrome via CDP.
 
+> 📖 **New here?** The step-by-step [User Manual](docs/USER_MANUAL.md) covers every way to use LocatorAgent. A single-file HTML version is at `docs/user-manual.html` (`npm run build:manual` regenerates it).
+
 ---
 
 ## ✨ Features
