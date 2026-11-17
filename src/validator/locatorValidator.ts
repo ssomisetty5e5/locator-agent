@@ -41,7 +41,8 @@ export class LocatorValidator {
   ): Promise<void> {
     // Build one big evaluate call for all CSS/XPath selectors at once
     // to minimize round-trips.
-    const cssSelectors: { index: number; selector: string }[] = [];
+    // `pierce` marks Playwright CSS, whose own count already searches open shadow roots
+    const cssSelectors: { index: number; selector: string; pierce: boolean }[] = [];
     const xpathSelectors: { index: number; expr: string }[] = [];
     const playwrightLocators: { index: number; locator: LocatorResult }[] = [];
 
@@ -52,8 +53,8 @@ export class LocatorValidator {
         // Can't validate this one (e.g. CSS >>> notation) — skip
         continue;
       }
-      if (parsed.type === 'css') {
-        cssSelectors.push({ index: i, selector: parsed.value });
+      if (parsed.type === 'css' || parsed.type === 'css-deep') {
+        cssSelectors.push({ index: i, selector: parsed.value, pierce: parsed.type === 'css-deep' });
       } else if (parsed.type === 'xpath') {
         xpathSelectors.push({ index: i, expr: parsed.value });
       } else if (parsed.type === 'playwright' || parsed.type === 'playwright-locator') {
@@ -70,18 +71,43 @@ export class LocatorValidator {
         const counts = await page.evaluate(
           `(() => {
             const cssSels = ${JSON.stringify(cssSelectors.map(s => s.selector))};
+            const cssPierce = ${JSON.stringify(cssSelectors.map(s => s.pierce))};
             const xpathExprs = ${JSON.stringify(xpathSelectors.map(s => s.expr))};
             const targetIdx = ${targetIndex ?? -1};
             const target = targetIdx >= 0 && window.__laNodes ? window.__laNodes[targetIdx] : null;
             const results = [];
 
-            // CSS
-            for (const sel of cssSels) {
+            // Open shadow roots reachable from the document (what Playwright's CSS engine also searches)
+            let shadowRoots = null;
+            const getShadowRoots = () => {
+              if (shadowRoots) return shadowRoots;
+              shadowRoots = [];
+              const visit = (root) => {
+                for (const el of root.querySelectorAll('*')) {
+                  if (el.shadowRoot) { shadowRoots.push(el.shadowRoot); visit(el.shadowRoot); }
+                }
+              };
+              visit(document);
+              return shadowRoots;
+            };
+            const queryDeep = (sel) => {
+              const out = new Set(document.querySelectorAll(sel));
+              for (const root of getShadowRoots()) root.querySelectorAll(sel).forEach((e) => out.add(e));
+              return out;
+            };
+
+            // CSS: [count, hitsTarget, deepCount, deepHitsTarget]
+            for (let i = 0; i < cssSels.length; i++) {
+              const sel = cssSels[i];
               try {
-                const matches = document.querySelectorAll(sel);
-                results.push([matches.length, target ? Array.prototype.includes.call(matches, target) : null]);
+                const matches = cssPierce[i] ? null : document.querySelectorAll(sel);
+                const deep = queryDeep(sel);
+                const hasTarget = target ? deep.has(target) : null;
+                results.push(matches
+                  ? [matches.length, target ? Array.prototype.includes.call(matches, target) : null, deep.size, hasTarget]
+                  : [deep.size, hasTarget, deep.size, hasTarget]);
               } catch(e) {
-                results.push([-1, null]);
+                results.push([-1, null, -1, null]);
               }
             }
 
@@ -107,16 +133,20 @@ export class LocatorValidator {
 
             return results;
           })()`
-        ) as [number, boolean | null][];
+        ) as [number, boolean | null, number?, (boolean | null)?][];
 
         // Map results back
         let ri = 0;
         for (const cs of cssSelectors) {
-          const [count, hit] = counts[ri++];
+          const [count, hit, deepCount, deepHit] = counts[ri++];
           if (count >= 0) {
             locators[cs.index].matchCount = count;
             locators[cs.index].isUnique = count === 1;
             if (hit !== null) locators[cs.index].resolvesToTarget = hit;
+            if (deepCount !== undefined && deepCount >= 0) {
+              locators[cs.index].deepMatchCount = deepCount;
+              if (deepHit !== null && deepHit !== undefined) locators[cs.index].deepResolvesToTarget = deepHit;
+            }
           }
         }
         for (const xs of xpathSelectors) {

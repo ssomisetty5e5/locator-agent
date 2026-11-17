@@ -8,7 +8,11 @@
 
 import { LocatorResult } from '../types';
 
-export type QueryableKind = 'css' | 'xpath' | 'playwright' | 'playwright-locator' | 'js-chain';
+/**
+ * `css` follows `querySelectorAll` (top-level document only); `css-deep` is a
+ * Playwright CSS selector, which also searches open shadow roots.
+ */
+export type QueryableKind = 'css' | 'css-deep' | 'xpath' | 'playwright' | 'playwright-locator' | 'js-chain';
 
 /**
  * Parse a LocatorResult and return a queryable selector, or null
@@ -50,8 +54,8 @@ export function extractQueryableSelector(loc: LocatorResult): { type: QueryableK
     if (loc.value.startsWith('getBy')) {
       return { type: 'playwright', value: loc.value };
     }
-    // Playwright CSS selectors (e.g. `#myId`)  — try as plain CSS
-    return { type: 'css', value: loc.value };
+    // Playwright CSS selectors (e.g. `#myId`) — page.locator() pierces open shadow roots
+    return { type: 'css-deep', value: loc.value };
   }
 
   // Selenium By.ID — just a raw id string, can be queried as CSS

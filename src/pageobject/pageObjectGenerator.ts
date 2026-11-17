@@ -84,13 +84,25 @@ export function toPlaywrightExpression(loc: LocatorResult): string | null {
   return null;
 }
 
+/**
+ * How the emitted Playwright expression behaves, as opposed to the locator in its
+ * native form: `page.locator(css)` searches open shadow roots, `querySelectorAll` does not.
+ */
+function playwrightMatch(loc: LocatorResult): { count: number | undefined; hitsTarget: boolean | undefined } {
+  if (loc.deepMatchCount !== undefined) return { count: loc.deepMatchCount, hitsTarget: loc.deepResolvesToTarget };
+  return { count: loc.matchCount, hitsTarget: loc.resolvesToTarget };
+}
+
 /** Choose the element's best locator, preferring ones proven to hit exactly the target. */
 function pickLocator(analysis: ElementAnalysis): { expression: string; loc: LocatorResult; verified: boolean } | null {
   const candidates = analysis.locators
     .map((loc) => ({ loc, expression: toPlaywrightExpression(loc) }))
     .filter((c): c is { loc: LocatorResult; expression: string } => c.expression !== null);
 
-  const verifiedList = candidates.filter((c) => c.loc.matchCount === 1 && c.loc.resolvesToTarget !== false);
+  const verifiedList = candidates.filter((c) => {
+    const m = playwrightMatch(c.loc);
+    return m.count === 1 && m.hitsTarget !== false;
+  });
   if (verifiedList.length > 0) {
     // A name-less role locator ("the only textbox") is unique today but silently
     // stops being unique when another such control is added. Prefer a descriptive

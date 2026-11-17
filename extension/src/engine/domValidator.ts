@@ -28,8 +28,18 @@ export class DomValidator {
       let chainBroken = false;
       try {
         switch (parsed.type) {
-          case 'css':
+          case 'css': {
             matches = Array.from(this.doc.querySelectorAll(parsed.value));
+            // Playwright's locator('css') also searches open shadow roots
+            const deep = this.ctx.cssDeep(this.doc, parsed.value);
+            loc.deepMatchCount = deep.length;
+            if (target) loc.deepResolvesToTarget = deep.includes(target);
+            break;
+          }
+          case 'css-deep':
+            matches = this.ctx.cssDeep(this.doc, parsed.value);
+            loc.deepMatchCount = matches.length;
+            if (target) loc.deepResolvesToTarget = matches.includes(target);
             break;
           case 'xpath':
             matches = this.xpath(parsed.value);

@@ -153,6 +153,16 @@ export interface LocatorResult {
   resolvesToTarget?: boolean;
 
   /**
+   * Same as `matchCount` / `resolvesToTarget`, but searching inside open shadow
+   * roots the way Playwright's `locator('css')` does. Set only on plain CSS
+   * locators, whose `matchCount` follows `querySelectorAll` (what Selenium
+   * and the browser console see). Page objects emit `page.locator(css)`, so
+   * they are verified against these.
+   */
+  deepMatchCount?: number;
+  deepResolvesToTarget?: boolean;
+
+  /**
    * Iframes the locator is relative to, outermost first. The locator `value`
    * is written relative to the innermost frame; use `formatWithFrames()` to
    * get a Playwright expression that includes the `frameLocator(...)` chain.

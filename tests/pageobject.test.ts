@@ -121,6 +121,19 @@ describe('generatePageObject', () => {
     expect(bad.elements[0].verified).toBe(false);
   });
 
+  it('verifies CSS locators the way page.locator() behaves, searching shadow roots', () => {
+    const input = el({ tag: 'input' });
+    const pick = (l: LocatorResult) =>
+      generatePageObject(analysisOf([analysis(input, [l])])).elements[0];
+
+    // invisible to querySelectorAll, but page.locator('#email') finds exactly the target
+    expect(pick(loc({ strategy: 'css', framework: 'css', value: '#email', matchCount: 0, deepMatchCount: 1, deepResolvesToTarget: true })).verified).toBe(true);
+    // unique at the top level, but Playwright would also find a second one inside a shadow root
+    expect(pick(loc({ strategy: 'css', framework: 'css', value: '#email', matchCount: 1, resolvesToTarget: true, deepMatchCount: 2, deepResolvesToTarget: true })).verified).toBe(false);
+    // no deep result (e.g. validated by an older engine): fall back to the plain count
+    expect(pick(loc({ strategy: 'css', framework: 'css', value: '#email', matchCount: 1, resolvesToTarget: true })).verified).toBe(true);
+  });
+
   it('prefers a descriptive verified locator over a bare role locator, unless it trails by too much', () => {
     const bare = loc({ value: "getByRole('textbox')", score: 92 });
     const placeholder = loc({ strategy: 'placeholder', value: "getByPlaceholder('Email')", score: 80 });

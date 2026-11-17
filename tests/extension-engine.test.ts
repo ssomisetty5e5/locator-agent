@@ -87,8 +87,14 @@ describe('extension engine', () => {
         for (const rl of r.locators) {
           const el = extLocators.get(key(rl))!;
           compared++;
-          if (rl.matchCount !== el.matchCount || rl.resolvesToTarget !== el.resolvesToTarget) {
-            problems.push(`${key(rl)}: playwright ${rl.matchCount}/${rl.resolvesToTarget} vs engine ${el.matchCount}/${el.resolvesToTarget}`);
+          if (
+            rl.matchCount !== el.matchCount || rl.resolvesToTarget !== el.resolvesToTarget ||
+            rl.deepMatchCount !== el.deepMatchCount || rl.deepResolvesToTarget !== el.deepResolvesToTarget
+          ) {
+            problems.push(
+              `${key(rl)}: playwright ${rl.matchCount}/${rl.resolvesToTarget} (deep ${rl.deepMatchCount}/${rl.deepResolvesToTarget})` +
+              ` vs engine ${el.matchCount}/${el.resolvesToTarget} (deep ${el.deepMatchCount}/${el.deepResolvesToTarget})`,
+            );
           }
         }
         if (r.recommended.value !== e.recommended.value) {

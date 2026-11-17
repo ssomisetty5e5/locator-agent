@@ -36,6 +36,7 @@ export class QueryContext {
   private role = new WeakMap<Element, string | null>();
   private hidden = new WeakMap<Element, boolean>();
   private all = new WeakMap<ParentNode, Element[]>();
+  private shadowRoots = new WeakMap<ParentNode, ShadowRoot[]>();
 
   /** Every element under `root`, descending into open shadow roots (root itself excluded). */
   elements(root: ParentNode): Element[] {
@@ -92,13 +93,32 @@ export class QueryContext {
   /** `querySelectorAll` that also searches open shadow roots (Playwright's CSS engine does). */
   cssDeep(root: ParentNode, selector: string): Element[] {
     const out = new Set<Element>();
-    const visit = (node: ParentNode) => {
-      node.querySelectorAll(selector).forEach((e) => out.add(e));
-      for (const el of Array.from(node.querySelectorAll('*'))) if (el.shadowRoot) visit(el.shadowRoot);
-    };
-    visit(root);
-    if ((root as Element).shadowRoot) visit((root as Element).shadowRoot as ShadowRoot);
+    root.querySelectorAll(selector).forEach((e) => out.add(e));
+    for (const shadow of this.shadowRootsUnder(root)) shadow.querySelectorAll(selector).forEach((e) => out.add(e));
     return [...out];
+  }
+
+  /** Open shadow roots at any depth under `root` (plus the root's own, when it is a host); cached. */
+  private shadowRootsUnder(root: ParentNode): ShadowRoot[] {
+    const cached = this.shadowRoots.get(root);
+    if (cached) return cached;
+    const out: ShadowRoot[] = [];
+    const visit = (node: ParentNode) => {
+      for (const el of Array.from(node.querySelectorAll('*'))) {
+        if (el.shadowRoot) {
+          out.push(el.shadowRoot);
+          visit(el.shadowRoot);
+        }
+      }
+    };
+    const own = (root as Element).shadowRoot;
+    if (own) {
+      out.push(own);
+      visit(own);
+    }
+    visit(root);
+    this.shadowRoots.set(root, out);
+    return out;
   }
 
   /** `a >> b >> c`: each part is searched inside the matches of the previous one. */
