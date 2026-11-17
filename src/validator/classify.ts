@@ -89,6 +89,16 @@ export function extractQueryableSelector(loc: LocatorResult): { type: QueryableK
 }
 
 /**
+ * How a locator behaves as the Playwright expression it is emitted as:
+ * `page.locator(css)` searches open shadow roots, `querySelectorAll` does not.
+ * Plain CSS locators therefore carry a separate deep result.
+ */
+export function playwrightMatch(loc: LocatorResult): { count: number | undefined; hitsTarget: boolean | undefined } {
+  if (loc.deepMatchCount !== undefined) return { count: loc.deepMatchCount, hitsTarget: loc.deepResolvesToTarget };
+  return { count: loc.matchCount, hitsTarget: loc.resolvesToTarget };
+}
+
+/**
  * Translated locators (e.g. WebdriverIO `$('aria/Save')`) that couldn't be
  * run directly inherit the result of the locator they were derived from,
  * so an unverified translation can't outrank a source known to be ambiguous.

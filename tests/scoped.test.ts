@@ -42,6 +42,16 @@ describe('ScopedLocatorGenerator', () => {
     expect(gen.generate(el, [], [anc({ tag: 'tr', texts: ['a1'] })])).toEqual([]);
   });
 
+  it('scopes by a web component, with its text or on its own', () => {
+    const out = gen.generate(el, base, [anc({ tag: 'task-item', texts: ['Write report'] })]);
+    expect(out.map((o) => o.value)).toEqual([
+      "locator('task-item').getByRole('button', { name: 'Delete' })",
+      "locator('task-item').filter({ hasText: 'Write report' }).getByRole('button', { name: 'Delete' })",
+    ]);
+    // plain unnamed <div>s are still not scopes
+    expect(gen.generate(el, base, [anc({ tag: 'div', texts: ['Write report'] })])).toEqual([]);
+  });
+
   it('escapes quotes in scope text', () => {
     const out = gen.generate(el, base, [anc({ tag: 'li', texts: ["Bob's order"] })]);
     expect(out[0].value).toContain("hasText: 'Bob\\'s order'");
@@ -82,6 +92,29 @@ describe('scoped locators on real pages', () => {
       expect(wdio.every((l) => l.matchCount !== undefined)).toBe(true);
       expect(d.recommended.framework).not.toBe('webdriverio');
     }
+  }, 60_000);
+
+  it('scopes repeated buttons inside web components to their host, reading text across the shadow boundary', async () => {
+    const html = `<html><body>
+      <task-item></task-item><task-item></task-item><task-item></task-item>
+      <script>
+        ['Write report', 'Review budget', 'Send invoice'].forEach((t, i) => {
+          const s = document.querySelectorAll('task-item')[i].attachShadow({ mode: 'open' });
+          s.innerHTML = '<div><span>' + t + '</span><button>Done</button></div>';
+        });
+      </script></body></html>`;
+
+    const result = await agent.analyze({ html });
+    const dones = result.elements.filter((e) => e.element.tag === 'button');
+    expect(dones).toHaveLength(3);
+    for (const d of dones) {
+      // Even though a positional JavaScript chain is unique, a Playwright locator is still wanted
+      expect(d.recommended.strategy).toBe('scoped');
+      expect(d.recommended.matchCount).toBe(1);
+      expect(d.recommended.resolvesToTarget).toBe(true);
+      expect(d.recommended.value).toMatch(/^locator\('task-item'\)\.filter\(\{ hasText: '(Write report|Review budget|Send invoice)' \}\)/);
+    }
+    expect(new Set(dones.map((d) => d.recommended.value)).size).toBe(3);
   }, 60_000);
 
   it('uses a container test id when cards carry one', async () => {

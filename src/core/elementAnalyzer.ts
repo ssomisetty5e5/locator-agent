@@ -10,6 +10,7 @@ import { AncestorInfo, DiscoveredElement, ElementAnalysis, LocatorResult } from 
 import { LocatorGenerator } from '../generator';
 import { LocatorRanker } from '../ranker';
 import { ScopedLocatorGenerator } from '../generator/scopedLocatorGenerator';
+import { playwrightMatch } from '../validator/classify';
 
 /** Keep at most this many validated scoped locators per element */
 const MAX_SCOPED_RESULTS = 3;
@@ -67,17 +68,18 @@ export class ElementAnalyzer {
   }
 
   /**
-   * True when no locator finds the element both uniquely and without relying
-   * on its position (nth-of-type / nth-child / [n] indexes), which break as
-   * soon as rows or items are added, removed or reordered.
+   * True when no Playwright locator (getBy*, CSS, XPath) finds the element both
+   * uniquely and without relying on its position (nth-of-type / nth-child / [n]
+   * indexes), which break as soon as rows or items are added, removed or reordered.
+   * A unique JavaScript or Selenium locator doesn't count: scoped locators exist
+   * to give Playwright users something unique to write.
    */
   private needsScope(ranked: LocatorResult[]): boolean {
-    return !ranked.some(
-      (l) =>
-        l.matchCount === 1 &&
-        l.resolvesToTarget !== false &&
-        !/nth-(of-type|child)|\[\d+\]/.test(l.value),
-    );
+    return !ranked.some((l) => {
+      if (l.framework !== 'playwright' && l.framework !== 'css' && l.framework !== 'xpath') return false;
+      const m = playwrightMatch(l);
+      return m.count === 1 && m.hitsTarget !== false && !/nth-(of-type|child)|\[\d+\]/.test(l.value);
+    });
   }
 
   /**

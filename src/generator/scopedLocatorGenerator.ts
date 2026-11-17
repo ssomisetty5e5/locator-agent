@@ -108,13 +108,17 @@ export class ScopedLocatorGenerator {
       }
 
       // 2) Repeated containers (row, list item, card) narrowed by their own text
+      // Custom elements (web components) are the containers of component UIs
+      const isComponent = a.tag.includes('-');
       const containerCss = a.role
         ? `[role="${escapeCssAttr(a.role)}"]`
-        : CONTAINER_TAGS.has(a.tag) ? a.tag : null;
+        : CONTAINER_TAGS.has(a.tag) || isComponent ? a.tag : null;
       if (containerCss) {
         for (const text of a.texts.slice(0, MAX_TEXTS_PER_SCOPE)) {
           textual.push({ css: containerCss, hasText: text });
         }
+        // A component that appears once needs no text to pin it
+        if (isComponent && !a.role) stable.push({ css: containerCss });
       }
     }
 

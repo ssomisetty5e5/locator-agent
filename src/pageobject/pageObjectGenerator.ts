@@ -7,6 +7,7 @@
 
 import { ElementAnalysis, LocatorResult, PageAnalysis } from '../types';
 import { playwrightFramePrefix } from '../util/frames';
+import { playwrightMatch } from '../validator/classify';
 import { nameElements, toPascal, toWords } from './elementNamer';
 import {
   LANGUAGES,
@@ -82,15 +83,6 @@ export function toPlaywrightExpression(loc: LocatorResult): string | null {
     return `${root}.locator(${quote('xpath=' + loc.value)})`;
   }
   return null;
-}
-
-/**
- * How the emitted Playwright expression behaves, as opposed to the locator in its
- * native form: `page.locator(css)` searches open shadow roots, `querySelectorAll` does not.
- */
-function playwrightMatch(loc: LocatorResult): { count: number | undefined; hitsTarget: boolean | undefined } {
-  if (loc.deepMatchCount !== undefined) return { count: loc.deepMatchCount, hitsTarget: loc.deepResolvesToTarget };
-  return { count: loc.matchCount, hitsTarget: loc.resolvesToTarget };
 }
 
 /** Choose the element's best locator, preferring ones proven to hit exactly the target. */
