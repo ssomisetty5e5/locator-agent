@@ -255,6 +255,16 @@ Locator kinds you will see:
 
 The tool can only choose among what the page offers. The largest single improvement is **stable test hooks** on interactive elements.
 
+**The extension writes the request for you.** When an element's best locator is weak (score below 70, or not unique), the panel shows a yellow **Weak locator** box with:
+
+- what to add to the element (for example `data-testid="save-button"`, an `aria-label`, or a stable key on a repeated row),
+- the **ideal locator** your tests could then use (`page.getByTestId('save-button')`), with a **Copy** button,
+- **Copy note for developer**: a short Markdown note with the page, the element, its current locator and score, the problem, and the fix.
+
+After **Analyze page**, the **💡 N of M elements need a better hook** box offers **Copy report** and **Download .md**: one Markdown file listing every weak element, worst first, with a summary of what is needed and suggested test ids that are unique across the page. Send that file to the developers and re-run the analysis after their next build to see the numbers improve.
+
+The suggested names are starting points built from the element's label or its component name. Use your team's naming convention.
+
 Ask for:
 
 1. A **`data-testid`** (or your team's equivalent attribute) on buttons, inputs, links, dialog containers, menu items and the container of each repeated item (row, card).
@@ -263,7 +273,7 @@ Ask for:
 4. For **web components**, put the test id on the element inside the component that tests interact with, not only on the component host.
 5. A **distinguishing attribute on repeated items** (a record id on each row) so scoped locators do not depend on display text.
 
-Use the audit from [Recipe C](#6-recipe-c-audit-how-testable-a-screen-is) to back the request with numbers: "On this screen, 45% of the best locators score below 85."
+Use the extension's developer report (above) or the audit from [Recipe C](#6-recipe-c-audit-how-testable-a-screen-is) to back the request with numbers: "On this screen, 45% of the best locators score below 85."
 
 ## 12. Worked example: a web-component application
 

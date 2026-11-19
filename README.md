@@ -22,7 +22,7 @@ An intelligent agent that analyzes web pages — including deep Shadow DOM trees
 - **3 Web UIs** — Simple URL analyzer, embedded headless browser, and native CDP browser mode
 - **Browser Extension** — Pick any element or analyze the whole page right in Chrome/Edge, with no server, and export page objects ([details](#-browser-extension-chrome--edge))
 - **CLI & REST API** — Terminal tool and HTTP endpoint for CI/CD integration
-- **215 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
+- **230 Tests** — Unit and live-page tests covering discovery, generation, ranking, stability heuristics, shadow-DOM validation, and end-to-end analysis
 
 ---
 

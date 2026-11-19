@@ -10,6 +10,7 @@ import { parseAncestors } from '../../../src/discoverer/ancestorProbe';
 import { parseTraversalResult } from '../../../src/traverser/shadowDomTraverser';
 import { ElementAnalyzer, ElementDriver } from '../../../src/core/elementAnalyzer';
 import { generatePageObject, LANGUAGES, PageObjectLanguage, toPlaywrightExpression } from '../../../src/pageobject';
+import { suggestImprovements, developerNote, developerReport } from '../../../src/suggest/improvements';
 import { DiscoveredElement, ElementAnalysis, PageAnalysis } from '../../../src/types';
 import { DomValidator } from './domValidator';
 import { frameSelectorFor } from './frames';
@@ -95,5 +96,5 @@ export function nodeFor(element: DiscoveredElement, doc: Document = document): E
   return element.nodeIndex !== undefined && win?.__laNodes ? win.__laNodes[element.nodeIndex] ?? null : null;
 }
 
-export { generatePageObject, LANGUAGES, toPlaywrightExpression };
+export { generatePageObject, LANGUAGES, toPlaywrightExpression, suggestImprovements, developerNote, developerReport };
 export type { PageObjectLanguage };

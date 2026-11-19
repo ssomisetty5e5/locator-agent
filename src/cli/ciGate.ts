@@ -2,7 +2,7 @@
 // CI gate: flag elements whose best locator is not trustworthy enough
 // ============================================================
 
-import { PageAnalysis } from '../types';
+import { LocatorResult, PageAnalysis } from '../types';
 
 export interface WeakElement {
   /** 1-based position in the analysis */
@@ -15,21 +15,25 @@ export interface WeakElement {
 }
 
 /**
- * Elements whose recommended locator scores below `threshold`, or was proven
- * not to find exactly the target element (no match, several matches, or the wrong one).
+ * Why a recommended locator can't be trusted, or '' when it can: it scores below
+ * `threshold`, or was proven not to find exactly the target element (no match,
+ * several matches, or the wrong one).
  */
+export function weakReason(rec: LocatorResult, threshold: number): string {
+  if (rec.score < threshold) return `score ${rec.score} is below ${threshold}`;
+  if (rec.matchCount !== undefined && rec.matchCount !== 1) {
+    return rec.matchCount === 0 ? 'matches nothing' : `matches ${rec.matchCount} elements`;
+  }
+  if (rec.resolvesToTarget === false) return 'matches a different element';
+  return '';
+}
+
+/** Elements whose recommended locator is weak by `weakReason`. */
 export function findWeakElements(analysis: PageAnalysis, threshold: number): WeakElement[] {
   const weak: WeakElement[] = [];
   analysis.elements.forEach((a, i) => {
     const rec = a.recommended;
-    let reason = '';
-    if (rec.score < threshold) {
-      reason = `score ${rec.score} is below ${threshold}`;
-    } else if (rec.matchCount !== undefined && rec.matchCount !== 1) {
-      reason = rec.matchCount === 0 ? 'matches nothing' : `matches ${rec.matchCount} elements`;
-    } else if (rec.resolvesToTarget === false) {
-      reason = 'matches a different element';
-    }
+    const reason = weakReason(rec, threshold);
     if (reason) {
       weak.push({
         index: i + 1,

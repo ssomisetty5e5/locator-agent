@@ -191,6 +191,46 @@ describe('extension in Chromium', () => {
     await page.close();
   }, 120_000);
 
+  it('suggests what to add for a weak locator, and builds a report for the developers', async (t) => {
+    if (unsupported) return t.skip();
+    const page = await ctx!.newPage();
+    // Three icon-only buttons inside a component: no text, label or test id to tell them apart
+    const icon = '<button style="padding:12px"><svg width="10" height="10"></svg></button>';
+    await page.route(`${base}/weak.html`, (route) => route.fulfill({
+      contentType: 'text/html',
+      body: `<html><head><title>Weak page</title></head><body><tool-bar></tool-bar><script>
+        document.querySelector('tool-bar').attachShadow({ mode: 'open' }).innerHTML = '<div>${icon.repeat(3)}</div>';
+      </script></body></html>`,
+    }));
+    await page.goto(`${base}/weak.html`);
+    await inject(page);
+    await panel(page).locator('.panel').waitFor({ state: 'visible' });
+
+    // Pick the last one: a suggestion box appears under the recommendation
+    await panel(page).getByRole('button', { name: 'Pick element' }).click();
+    await page.locator('tool-bar button').last().click({ position: { x: 3, y: 3 } }); // the padding, not the icon
+    const box = panel(page).locator('.sugg');
+    await box.waitFor({ timeout: 15_000 });
+    const text = await box.innerText();
+    expect(text).toContain('Weak locator');
+    expect(text).toContain('data-testid="tool-bar-button"');
+    expect(text).toContain("page.getByTestId('tool-bar-button')");
+    expect(text).toContain('aria-label=');
+    await box.getByRole('button', { name: 'Copy note for developer' }).waitFor();
+
+    // Analyze the page: the report offers the weak elements (the first button has a unique chain)
+    await panel(page).getByRole('button', { name: 'Analyze page' }).click();
+    await panel(page).locator('.item').first().waitFor({ timeout: 30_000 });
+    await panel(page).getByText('2 of 3 elements need a better hook').waitFor({ timeout: 5_000 });
+    await panel(page).getByRole('button', { name: 'Copy report' }).waitFor();
+    await panel(page).getByRole('button', { name: 'Download .md' }).waitFor();
+
+    // Opening the last item shows the same suggestion
+    await panel(page).locator('.item .head').last().click();
+    await panel(page).locator('.item .detail .sugg').first().waitFor({ timeout: 5_000 });
+    await page.close();
+  }, 120_000);
+
   it('leaves the page untouched until picking is cancelled with Escape', async (t) => {
     if (unsupported) return t.skip();
     const page = await ctx!.newPage();

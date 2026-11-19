@@ -44,6 +44,11 @@ input.filter { width: 100%; cursor: text; }
 .m-ok { color: #5fd1a1; } .m-warn { color: #f0c05a; } .m-bad { color: #ff8b8b; } .m-none { color: #8b92c9; }
 .copy { background: none; border: 1px solid #343a63; color: #b9bff5; border-radius: 6px; padding: 2px 8px; font: inherit; font-size: 11px; cursor: pointer; }
 .copy:hover { background: #2a2f4d; }
+.sugg { background: #2a2412; border: 1px solid #5a4a1e; border-radius: 10px; padding: 10px; margin: 8px 0; }
+.sugg .lbl { font-size: 12px; color: #f0c05a; font-weight: 600; margin-bottom: 6px; }
+.sugg .imp { background: #1d1a10; border-radius: 8px; padding: 7px 9px; margin: 6px 0; }
+.sugg .imp .code { color: #9fe3c5; }
+.sugg .imp .code.ideal { color: #b9bff5; }
 .item { border: 1px solid #262a45; border-radius: 10px; margin: 8px 0; }
 .item > .head { display: flex; gap: 8px; align-items: center; padding: 8px 10px; cursor: pointer; }
 .item > .head:hover { background: #1b1f33; border-radius: 10px; }

@@ -5,7 +5,10 @@
 // the whole page and generate a page object.
 // ============================================================
 
-import { analyzeElement, analyzePage, generatePageObject, LANGUAGES, nodeFor, toPlaywrightExpression } from '../engine';
+import {
+  analyzeElement, analyzePage, developerNote, developerReport, generatePageObject, LANGUAGES, nodeFor,
+  suggestImprovements, toPlaywrightExpression,
+} from '../engine';
 import type { PageObjectLanguage } from '../engine';
 import type { DiscoveredElement, ElementAnalysis, LocatorResult, PageAnalysis } from '../../../src/types';
 import { Picker } from './picker';
@@ -205,9 +208,34 @@ export class Panel {
           this.copyButton(() => copyValue(best)),
         ),
       ));
+      view.append(this.suggestionBox(a));
     }
     view.append(this.locatorTable(a));
     return view;
+  }
+
+  /**
+   * "Make this locator more reliable": what the application could add, the ideal
+   * locator that would give, and a note to send to the developer. Empty when the
+   * best locator is already trustworthy.
+   */
+  private suggestionBox(a: ElementAnalysis): HTMLElement {
+    const s = suggestImprovements(a);
+    if (!s || s.improvements.length === 0) return h('div', {});
+    const note = () => developerNote(a, { pageUrl: location.href, pageTitle: document.title });
+    return h('div', { class: 'sugg' },
+      h('div', { class: 'lbl' }, `💡 Weak locator (score ${s.score}). Ask the developers to add:`),
+      ...s.improvements.map((i) => h('div', { class: 'imp' },
+        h('div', { class: 'code' }, i.snippet),
+        h('div', { class: 'dim' }, i.reason),
+        h('div', { class: 'row', style: 'border:0;padding:4px 0 0;align-items:center' },
+          h('span', { class: 'dim', style: 'flex:0 0 auto' }, 'Then use'),
+          h('span', { class: 'code ideal', style: 'flex:1' }, i.idealLocator),
+          this.copyButton(() => i.idealLocator)),
+      )),
+      h('div', { class: 'row', style: 'border:0;padding:6px 0 0;justify-content:flex-end' },
+        this.copyButton(note, 'Copy note for developer')),
+    );
   }
 
   private locatorTable(a: ElementAnalysis): HTMLElement {
@@ -252,6 +280,7 @@ export class Panel {
       ),
       frames > 0 && h('p', { class: 'note' }, `${frames === 1 ? '1 iframe is' : `${frames} iframes are`} not included here. Use “Pick element” to inspect inside same-origin iframes.`),
       this.pageObjectBox(analysis),
+      this.developerReportBox(analysis),
       filter,
       h('div', {}, ...items.map((it) => it.root)),
     );
@@ -266,7 +295,7 @@ export class Panel {
 
     const head = h('div', { class: 'head', onclick: () => {
       const open = detail.style.display === 'none';
-      if (open && !built) { detail.append(this.locatorTable(a)); built = true; }
+      if (open && !built) { detail.append(this.suggestionBox(a), this.locatorTable(a)); built = true; }
       detail.style.display = open ? '' : 'none';
       const node = nodeFor(el);
       if (open && node) { node.scrollIntoView({ block: 'center', behavior: 'smooth' }); this.flash(node); }
@@ -304,6 +333,22 @@ export class Panel {
       h('div', { class: 'row', style: 'border:0;padding:0;align-items:center' },
         h('span', { style: 'flex:1' }, 'Generate a Playwright page object'), lang, generate),
       out);
+  }
+
+  /** A Markdown report of every weak locator and what to add, to hand to the developers. */
+  private developerReportBox(analysis: PageAnalysis): HTMLElement {
+    const report = developerReport(analysis);
+    if (report.weak === 0) {
+      return h('div', { class: 'item', style: 'padding:10px' },
+        h('span', { class: 'dim' }, 'Every analyzed element has a reliable locator. Nothing to ask the developers for.'));
+    }
+    const filename = 'locator-improvement-request.md';
+    return h('div', { class: 'item', style: 'padding:10px' },
+      h('div', { class: 'row', style: 'border:0;padding:0;align-items:center' },
+        h('span', { style: 'flex:1' }, `💡 ${report.weak} of ${report.total} elements need a better hook`),
+        this.copyButton(() => report.markdown, 'Copy report'),
+        h('button', { class: 'copy', onclick: () => download(filename, report.markdown) }, 'Download .md')),
+      h('div', { class: 'dim' }, 'A Markdown request for the developers: what to add to each element so tests get a stable locator.'));
   }
 
   // ── Small pieces ──────────────────────────────────────────

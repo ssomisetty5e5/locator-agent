@@ -238,6 +238,7 @@ The extension gives you locators for the page you are looking at, directly in Ch
    2. Click **Analyze page**.
    3. Use the filter box to search; click an item to expand its locators and to scroll to and flash the element on the page.
 5. To export a page object: after analyzing, choose a language (typescript, python, java) and click **Page object**. Then **Copy** it or **Download** the file.
+6. When an element's best locator is weak (score below 70, or not unique), a yellow **Weak locator** box lists what the application could add (a `data-testid`, an `aria-label`, a stable id, or a key on a repeated row) and the **ideal locator** tests could then use. **Copy note for developer** copies a ready-to-send Markdown note. After **Analyze page**, **Copy report** or **Download .md** gives one request listing every weak element, worst first.
 
 ![The extension panel after analyzing a page](images/extension-analyze.png)
 
